@@ -1,5 +1,6 @@
 mod collapsible_match;
 mod infallible_destructuring_match;
+mod manual_filter;
 mod manual_map;
 mod manual_unwrap_or;
 mod match_as_ref;
@@ -898,6 +899,25 @@ declare_clippy_lint! {
     "reimplementation of `map`"
 }
 
+declare_clippy_lint! {
+    /// ### What it does
+    ///
+    /// ### Why is this bad?
+    ///
+    /// ### Example
+    /// ```rust
+    /// // example code where clippy issues a warning
+    /// ```
+    /// Use instead:
+    /// ```rust
+    /// // example code which does not raise clippy warning
+    /// ```
+    #[clippy::version = "1.65.0"]
+    pub MANUAL_FILTER,
+    complexity,
+    "default lint description"
+}
+
 #[derive(Default)]
 pub struct Matches {
     msrv: Option<RustcVersion>,
@@ -939,6 +959,7 @@ impl_lint_pass!(Matches => [
     SIGNIFICANT_DROP_IN_SCRUTINEE,
     TRY_ERR,
     MANUAL_MAP,
+    MANUAL_FILTER,
 ]);
 
 impl<'tcx> LateLintPass<'tcx> for Matches {
@@ -979,6 +1000,7 @@ impl<'tcx> LateLintPass<'tcx> for Matches {
                     single_match::check(cx, ex, arms, expr);
                     match_bool::check(cx, ex, arms, expr);
                     overlapping_arms::check(cx, ex, arms);
+                    manual_filter::check(cx, ex, arms, expr);
                     match_wild_enum::check(cx, ex, arms);
                     match_as_ref::check(cx, ex, arms, expr);
                     needless_match::check_match(cx, ex, arms, expr);
