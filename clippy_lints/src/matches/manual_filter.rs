@@ -91,7 +91,7 @@ struct FilterCond<'tcx> {
 }
 
 impl<'tcx> FilterCond<'tcx> {
-    fn to_string(self, cx: &'tcx LateContext<'tcx>, name: String, app: &'tcx mut Applicability) -> String {
+    fn to_string(self, cx: &'tcx LateContext<'tcx>, name: String, app: &mut Applicability) -> String {
         let cond_str = AddDerefVisitor::deref_cond(cx, name, self.cond).unwrap_or("..".to_string());
         if self.inverted {
             format!("!({})", cond_str)
@@ -115,13 +115,13 @@ fn arm_some_first_arm_none_second<'tcx>(
 }
 
 /// Add deref operators (`*`) to all Paths matching `name`
-struct AddDerefVisitor<'tcx> {
+struct AddDerefVisitor<'a, 'tcx> {
     name: String, // Possibly use `u32` from symbol instead?
-    cx: &'tcx LateContext<'tcx>,
+    cx: &'a LateContext<'tcx>,
     deref_vec: Vec<usize>, // index of where to add `*`
 }
 
-impl<'tcx> Visitor<'tcx> for AddDerefVisitor<'tcx> {
+impl<'a, 'tcx> Visitor<'tcx> for AddDerefVisitor<'a, 'tcx> {
     fn visit_expr(&mut self, expr: &'tcx Expr<'_>) {
         if let ExprKind::Path(qpath) = &expr.kind {
             if let Some(def_id) = self.cx.qpath_res(&qpath, expr.hir_id).opt_def_id() {
@@ -135,8 +135,8 @@ impl<'tcx> Visitor<'tcx> for AddDerefVisitor<'tcx> {
     }
 }
 
-impl<'tcx> AddDerefVisitor<'tcx> {
-    fn new(cx: &'tcx LateContext<'tcx>, name: String) -> Self {
+impl<'a, 'tcx> AddDerefVisitor<'a, 'tcx> {
+    fn new(cx: &'a LateContext<'tcx>, name: String) -> Self {
         Self {
             cx,
             name,
@@ -144,7 +144,7 @@ impl<'tcx> AddDerefVisitor<'tcx> {
         }
     }
 
-    fn deref_cond(cx: &'tcx LateContext<'tcx>, name: String, expr: &'tcx Expr<'_>) -> Option<String> {
+    fn deref_cond(cx: &'a LateContext<'tcx>, name: String, expr: &'tcx Expr<'_>) -> Option<String> {
         let mut add_deref_visitor = Self::new(cx, name);
         add_deref_visitor.visit_expr(expr);
         add_deref_visitor.deref_vec.sort();
@@ -158,7 +158,7 @@ impl<'tcx> AddDerefVisitor<'tcx> {
     }
 }
 
-pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tcx [Arm<'_>], expr: &'tcx Expr<'_>) {
+pub(crate) fn check<'tcx>(cx: &'tcx LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tcx [Arm<'_>], expr: &'tcx Expr<'_>) {
     let expr_ctxt = expr.span.ctxt(); // what for?
     if_chain! {
         let ty = cx.typeck_results().expr_ty(expr);
@@ -172,6 +172,7 @@ pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tc
         then {
             let mut app = Applicability::MaybeIncorrect;
             let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
+            let i_cond_str = AddDerefVisitor::deref_cond(cx, name.to_string(), filter_cond.cond);
             let cond_str = filter_cond.to_string(cx, name.to_string(), &mut app);
             span_lint_and_sugg(cx,
                 MANUAL_FILTER,
