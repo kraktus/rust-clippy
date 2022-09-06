@@ -167,7 +167,7 @@ fn expr_ty_matches_p_ty(cx: &LateContext<'_>, expr: &Expr<'_>, p_expr: &Expr<'_>
     false
 }
 
-fn pat_same_as_expr(pat: &Pat<'_>, expr: &Expr<'_>) -> bool {
+pub(crate) fn pat_same_as_expr(pat: &Pat<'_>, expr: &Expr<'_>) -> bool {
     let expr = strip_return(expr);
     match (&pat.kind, &expr.kind) {
         // Example: `Some(val) => Some(val)`
