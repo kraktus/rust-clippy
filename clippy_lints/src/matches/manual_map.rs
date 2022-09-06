@@ -222,6 +222,7 @@ fn can_pass_as_func<'tcx>(cx: &LateContext<'tcx>, binding: HirId, expr: &'tcx Ex
     }
 }
 
+#[derive(Debug)]
 pub(super) enum OptionPat<'a> {
     Wild,
     None,
