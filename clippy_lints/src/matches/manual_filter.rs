@@ -14,7 +14,11 @@ use super::needless_match::pat_same_as_expr;
 use super::MANUAL_FILTER;
 
 // TODO doc
-fn handle_arm<'ctx>(cx: &LateContext<'ctx>, arm: &'ctx Arm<'_>, ctxt: SyntaxContext) -> Option<(OptionPat, Option<FilterCond>)> {
+fn handle_arm<'ctx>(
+    cx: &LateContext<'ctx>,
+    arm: &'ctx Arm<'_>,
+    ctxt: SyntaxContext,
+) -> Option<(OptionPat<'ctx>, Option<FilterCond<'ctx>>)> {
     let option_pat = try_parse_pattern(cx, arm.pat, ctxt);
     if_chain! {
         if let Some(OptionPat::Some { .. }) = option_pat;
@@ -23,13 +27,19 @@ fn handle_arm<'ctx>(cx: &LateContext<'ctx>, arm: &'ctx Arm<'_>, ctxt: SyntaxCont
         if block.stmts.is_empty();
         if let Some(block_expr) = block.expr;
         if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
-        if let Some((then_option_cond, else_option_cond)) = handle_if_or_else_expr(cx, arm.pat, then_expr).zip(handle_if_or_else_expr(cx, arm.pat, else_expr));
+        if let Some((then_option_cond, else_option_cond))
+            = handle_if_or_else_expr(cx, arm.pat, then_expr).zip(handle_if_or_else_expr(cx, arm.pat, else_expr));
         if then_option_cond != else_option_cond;
         then {
             let inverted = then_option_cond == OptionCond::Some;
+            let filter_cond = FilterCond {
+                inverted,
+                cond
+            };
+            return option_pat.map(|x| (x, Some(filter_cond)))
         }
     }
-    None
+    option_pat.map(|x| (x, None))
 }
 
 // see doc for `handle_if_or_else_expr`
