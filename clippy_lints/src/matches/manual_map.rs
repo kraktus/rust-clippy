@@ -222,7 +222,7 @@ fn can_pass_as_func<'tcx>(cx: &LateContext<'tcx>, binding: HirId, expr: &'tcx Ex
     }
 }
 
-enum OptionPat<'a> {
+pub(super) enum OptionPat<'a> {
     Wild,
     None,
     Some {
@@ -241,7 +241,11 @@ struct SomeExpr<'tcx> {
 
 // Try to parse into a recognized `Option` pattern.
 // i.e. `_`, `None`, `Some(..)`, or a reference to any of those.
-fn try_parse_pattern<'tcx>(cx: &LateContext<'tcx>, pat: &'tcx Pat<'_>, ctxt: SyntaxContext) -> Option<OptionPat<'tcx>> {
+pub(super) fn try_parse_pattern<'tcx>(
+    cx: &LateContext<'tcx>,
+    pat: &'tcx Pat<'_>,
+    ctxt: SyntaxContext,
+) -> Option<OptionPat<'tcx>> {
     fn f<'tcx>(
         cx: &LateContext<'tcx>,
         pat: &'tcx Pat<'_>,
