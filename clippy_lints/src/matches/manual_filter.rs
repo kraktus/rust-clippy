@@ -18,8 +18,6 @@ use rustc_span::sym;
 use super::needless_match::pat_same_as_expr;
 use super::MANUAL_FILTER;
 
-
-
 pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr: &Expr<'_>) {
     if_chain! {
         let ty = cx.typeck_results().expr_ty(expr);
@@ -58,11 +56,22 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if let ExprKind::Call(func, args) = trailing_expr2.kind;
         if let ExprKind::Path(ref else_qpath) = func.kind;
         if is_lang_ctor(cx, else_qpath, OptionSome);
+        if pat_same_as_expr(arms[1].pat, trailing_expr2);
         if args.len() == 1; // TODO can probably be relaxed
         if let ExprKind::Path(ref qpath7) = args[0].kind;
         if match_qpath(qpath7, &["x"]);
         then {
-                    return;
+            let mut app = Applicability::MaybeIncorrect;
+            let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
+            let cond_str = snippet_with_applicability(cx, cond.span, "..", &mut app);
+            span_lint_and_sugg(cx,
+                MANUAL_FILTER,
+                expr.span,
+                "manual implementation of `Option::filter`",
+                "try",
+                format!("{}.filter(|{}| {})", var_str, name.name, cond_str),
+                app
+            )
         }
     }
 }
