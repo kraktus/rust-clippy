@@ -6,10 +6,9 @@ use clippy_utils::{
     eq_expr_value, get_parent_expr_for_hir, get_parent_node, higher, is_else_clause, is_expr_path_def_path,
     is_lang_ctor, match_def_path, over, peel_blocks_with_stmt,
 };
-use rustc_ast::ast::{LitIntType, LitKind};
 use rustc_errors::Applicability;
 use rustc_hir::LangItem::{OptionNone, OptionSome};
-use rustc_hir::{Arm, BinOpKind, BindingAnnotation, Expr, ExprKind, FnRetTy, Guard, Node, Pat, PatKind, Path, QPath};
+use rustc_hir::{Arm, BinOpKind, BindingAnnotation, Expr, ExprKind, FnRetTy, Guard, Node, Pat, PatKind, Path};
 use rustc_lint::LateContext;
 use rustc_typeck::hir_ty_to_ty;
 
@@ -26,7 +25,7 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if let PatKind::TupleStruct(ref qpath0, .. ) = &arms[0].pat.kind;
         if is_lang_ctor(cx, qpath0, OptionNone);
         // Check if the arm is equal to the body. Since we already know the arm `None`, the body is too
-        if pat_same_as_expr(arms[0].pat, arms[0].body);
+        if dbg!(pat_same_as_expr(arms[0].pat, arms[0].body));
         if arms[0].guard.is_none();
         // Now second arm
         // It needs to be of type

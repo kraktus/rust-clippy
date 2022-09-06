@@ -1,4 +1,5 @@
 #![warn(clippy::manual_filter)]
+#![warn(clippy::manual_map)] // DEBUG
 
 fn main() {
     match Some(0) {
@@ -11,4 +12,10 @@ fn main() {
             }
         },
     };
+
+    match Some(0) {
+        Some(x) => Some(x + 1),
+        _ => None,
+    };
+
 }
