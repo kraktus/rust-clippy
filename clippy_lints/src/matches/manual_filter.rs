@@ -14,17 +14,65 @@ use super::needless_match::pat_same_as_expr;
 use super::MANUAL_FILTER;
 
 // TODO doc
-fn handle_arm<'ctx>(cx: &LateContext<'ctx>, arm: &'ctx Arm<'_>, ctxt: SyntaxContext) -> Option<OptionPat<'ctx>> {
+fn handle_arm<'ctx>(cx: &LateContext<'ctx>, arm: &'ctx Arm<'_>, ctxt: SyntaxContext) -> Option<(OptionPat, Option<FilterCond>)> {
     let option_pat = try_parse_pattern(cx, arm.pat, ctxt);
-    if let Some(OptionPat::Some { .. }) = option_pat {
-        todo!()
-    };
-    todo!()
+    if_chain! {
+        if let Some(OptionPat::Some { .. }) = option_pat;
+        if arm.guard.is_none();
+        if let ExprKind::Block(block, None) = arm.body.kind;
+        if block.stmts.is_empty();
+        if let Some(block_expr) = block.expr;
+        if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
+        if let Some((then_option_cond, else_option_cond)) = handle_if_or_else_expr(cx, arm.pat, then_expr).zip(handle_if_or_else_expr(cx, arm.pat, else_expr));
+        if then_option_cond != else_option_cond;
+        then {
+            let inverted = then_option_cond == OptionCond::Some;
+        }
+    }
+    None
 }
 
-// Contains the cond part of the snippet below
-// if `inverted` is set to `true`, then `x` and `None` are swapped 
-// if cond {
+// see doc for `handle_if_or_else_expr`
+#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
+enum OptionCond {
+    None,
+    Some,
+}
+
+// function called for each <ifelse> expression:
+// Some(x) => if <cond> {
+//    <ifelse>
+// } else {
+//    <ifelse>
+// }
+// If <ifelse> resolves to `Some(x)` return Some(OptionCond::Some)
+// If <ifelse> resolves to `None, return Some(OptionCond::None)
+// If the expression is something else return `None`
+fn handle_if_or_else_expr<'tcx>(
+    cx: &LateContext<'_>,
+    pat: &Pat<'_>,
+    if_or_else_expr: &'tcx Expr<'_>,
+) -> Option<OptionCond> {
+    if_chain! {
+        if let ExprKind::Block(block, None) = if_or_else_expr.kind;
+        if block.stmts.is_empty();
+        if let Some(inner_if_or_else_expr) = block.expr;
+        then {
+        if pat_same_as_expr(pat, inner_if_or_else_expr) {
+            return Some(OptionCond::Some)
+        } else if let ExprKind::Path(ref then_qpath) = inner_if_or_else_expr.kind {
+                if is_lang_ctor(cx, then_qpath, OptionNone) {
+                    return Some(OptionCond::None);
+                }
+            }
+        }
+    }
+    None
+}
+
+// Contains the <cond> part of the snippet below
+// if `inverted` is set to `true`, then `x` and `None` are swapped
+// Some(x) => if <cond> {
 //    x
 // } else {
 //    None
@@ -62,6 +110,8 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if dbg!(is_lang_ctor(cx, qpath, OptionSome));
         if fields.len() == 1; // TODO can probably be relaxed
         if let PatKind::Binding(BindingAnnotation::Unannotated, _, name, None) = fields[0].kind;
+
+
         if dbg!(arms[1].guard.is_none());
         if let ExprKind::Block(block, None) = arms[1].body.kind;
         if dbg!(block.stmts.is_empty());
@@ -72,6 +122,7 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if let Some(then_expr) = block1.expr;
         if let ExprKind::Path(ref then_qpath) = then_expr.kind;
         if dbg!(is_lang_ctor(cx, then_qpath, OptionNone));
+
         if let ExprKind::Block(block2, None) = else_expr.kind;
         if dbg!(block2.stmts.is_empty());
         if let Some(trailing_expr2) = block2.expr;
@@ -80,6 +131,9 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if dbg!(is_lang_ctor(cx, else_qpath, OptionSome));
         if dbg!(pat_same_as_expr(arms[1].pat, trailing_expr2));
         if dbg!(args.len() == 1); // TODO can probably be relaxed
+
+
+
 
         if let PatKind::Path(ref qpath0) = &arms[0].pat.kind;
         if dbg!(is_lang_ctor(cx, qpath0, OptionNone));
