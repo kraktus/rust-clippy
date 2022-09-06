@@ -54,7 +54,6 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>], expr:
         if fields.len() == 1; // TODO can probably be relaxed
         if let PatKind::Binding(BindingAnnotation::Unannotated, _, name, None) = fields[0].kind; // name = x
         if arms[1].guard.is_none();
-        //
         if let ExprKind::Block(block, None) = arms[1].body.kind;
         if block.stmts.is_empty();
         if let Some(block_expr) = block.expr;
