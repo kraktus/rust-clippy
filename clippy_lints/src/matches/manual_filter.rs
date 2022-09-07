@@ -158,7 +158,7 @@ impl<'tcx> AddDerefVisitor<'tcx> {
     }
 }
 
-pub(crate) fn check<'tcx>(cx: &'tcx LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tcx [Arm<'_>], expr: &'tcx Expr<'_>) {
+pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tcx [Arm<'_>], expr: &'tcx Expr<'_>) {
     let expr_ctxt = expr.span.ctxt(); // what for?
     if_chain! {
         let ty = cx.typeck_results().expr_ty(expr);
@@ -173,7 +173,7 @@ pub(crate) fn check<'tcx>(cx: &'tcx LateContext<'tcx>, ex: &'tcx Expr<'_>, arms:
             let mut app = Applicability::MaybeIncorrect;
             let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
             //let i_cond_str = AddDerefVisitor::deref_cond(cx, name.to_string(), filter_cond.cond);
-            let cond_str = filter_cond.to_string(cx, name.to_string(), &mut app);
+            let cond_str = "foo".to_string(); //filter_cond.to_string(cx, name.to_string(), &mut app);
             span_lint_and_sugg(cx,
                 MANUAL_FILTER,
                 expr.span,
