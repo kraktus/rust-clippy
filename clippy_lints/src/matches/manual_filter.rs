@@ -105,12 +105,15 @@ fn get_cond_expr<'tcx>(
     ctxt: SyntaxContext,
 ) -> Option<SomeExpr<'tcx>> {
     if_chain! {
-        if let ExprKind::If(cond, ..) = expr.kind; // top level if
+        if let ExprKind::Block(block, None) = expr.kind;
+        if block.stmts.is_empty();
+        if let Some(block_expr) = block.expr;
+        if let ExprKind::If(cond, ..) = block_expr.kind; // top level if
         if let PatKind::Binding(_,target, ..) = pat.kind;
         then {
             let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
-            visitor_cond.visit_expr(expr);
-            if visitor_cond.is_equal_to_pat_bind {
+            visitor_cond.visit_expr(block_expr);
+            if dbg!(visitor_cond.is_equal_to_pat_bind) {
                 Some(SomeExpr {
                     expr: cond.peel_drop_temps(),
                     needs_unsafe_block: visitor_cond.needs_unsafe_block

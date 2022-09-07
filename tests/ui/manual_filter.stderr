@@ -1,4 +1,5 @@
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:4:5
    |
 LL | /     match Some(0) {
@@ -8,11 +9,12 @@ LL | |             if x > 0 {
 ...  |
 LL | |         },
 LL | |     };
-   | |_____^ help: try: `Some(0).filter(|&x| x <= 0)`
+   | |_____^ help: try this: `Some(0).filter(|x| x > 0)`
    |
-   = note: `-D clippy::manual-filter` implied by `-D warnings`
+   = note: `-D clippy::manual-map` implied by `-D warnings`
 
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:15:5
    |
 LL | /     match Some(1) {
@@ -22,9 +24,10 @@ LL | |                 None
 ...  |
 LL | |         None => None,
 LL | |     };
-   | |_____^ help: try: `Some(1).filter(|&x| x <= 0)`
+   | |_____^ help: try this: `Some(1).filter(|x| x > 0)`
 
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:26:5
    |
 LL | /     match Some(2) {
@@ -34,9 +37,10 @@ LL | |                 None
 ...  |
 LL | |         _ => None,
 LL | |     };
-   | |_____^ help: try: `Some(2).filter(|&x| x <= 0)`
+   | |_____^ help: try this: `Some(2).filter(|x| x > 0)`
 
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:37:5
    |
 LL | /     match Some(3) {
@@ -46,9 +50,10 @@ LL | |                 Some(x)
 ...  |
 LL | |         None => None,
 LL | |     };
-   | |_____^ help: try: `Some(3).filter(|&x| x > 0)`
+   | |_____^ help: try this: `Some(3).filter(|x| x > 0)`
 
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:49:5
    |
 LL | /     match y {
@@ -58,9 +63,10 @@ LL | |         Some(x) => {
 ...  |
 LL | |         },
 LL | |     };
-   | |_____^ help: try: `y.filter(|&x| x <= 0)`
+   | |_____^ help: try this: `y.filter(|x| x > 0)`
 
-error: manual implementation of `Option::filter`
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
   --> $DIR/manual_filter.rs:61:5
    |
 LL | /     match Some(5) {
@@ -70,10 +76,24 @@ LL | |                 Some(x)
 ...  |
 LL | |         _ => None,
 LL | |     };
-   | |_____^ help: try: `Some(5).filter(|&x| x > 0)`
+   | |_____^ help: try this: `Some(5).filter(|x| x > 0)`
 
-error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:85:5
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
+  --> $DIR/manual_filter.rs:72:5
+   |
+LL | /     match Some(6) {
+LL | |         // Not supported for now, but it could lint and remove `ref`, because this pattern only work if `x` implements
+LL | |         // the `Copy` trait.
+LL | |         Some(ref x) => {
+...  |
+LL | |         _ => None,
+LL | |     };
+   | |_____^ help: try this: `Some(6).as_ref().filter(|x| x > &0)`
+
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
+  --> $DIR/manual_filter.rs:86:5
    |
 LL | /     match Some(String::new()) {
 LL | |         Some(x) => {
@@ -82,19 +102,31 @@ LL | |                 Some(x)
 ...  |
 LL | |         _ => None,
 LL | |     };
-   | |_____^ help: try: `Some(String::new()).filter(|&x| external_cond)`
+   | |_____^ help: try this: `Some(String::new()).filter(|x| external_cond)`
 
-error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:96:5
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
+  --> $DIR/manual_filter.rs:97:5
    |
 LL | /     if let Some(x) = Some(7) {
-LL | |         if external_cond {
-LL | |                 Some(x)
-LL | |             } else {
-...  |
+LL | |         if external_cond { Some(x) } else { None }
+LL | |     } else {
 LL | |         None
 LL | |     };
-   | |_____^ help: try: `Some(7).filter(|&x| external_cond)`
+   | |_____^ help: try this: `Some(7).filter(|x| external_cond)`
 
-error: aborting due to 8 previous errors
+[clippy_lints/src/matches/manual_filter.rs:116] visitor_cond.is_equal_to_pat_bind = true
+error: manual implementation of `Option::map`
+  --> $DIR/manual_filter.rs:103:5
+   |
+LL | /     match &Some(8) {
+LL | |         &Some(x) => {
+LL | |             if x != 0 {
+LL | |                 Some(x)
+...  |
+LL | |         _ => None,
+LL | |     };
+   | |_____^ help: try this: `Some(8).filter(|x| x != 0)`
+
+error: aborting due to 10 previous errors
 
