@@ -1,13 +1,13 @@
 use clippy_utils::diagnostics::span_lint_and_sugg;
-use clippy_utils::source::{snippet_opt, snippet_with_applicability};
+use clippy_utils::source::snippet_with_applicability;
 use clippy_utils::ty::is_type_diagnostic_item;
 use clippy_utils::{is_lang_ctor, match_def_path};
 use rustc_errors::Applicability;
-use rustc_hir::intravisit::{walk_expr, Visitor};
 use rustc_hir::LangItem::OptionNone;
 use rustc_hir::{Arm, BindingAnnotation, Expr, ExprKind, Pat, PatKind};
 use rustc_lint::LateContext;
-use rustc_span::{sym, BytePos, SyntaxContext, symbol::Ident};
+use rustc_span::{sym, SyntaxContext};
+use clippy_utils::sugg::Sugg;
 
 use super::manual_map::{try_parse_pattern, OptionPat};
 use super::needless_match::pat_same_as_expr;
@@ -91,12 +91,12 @@ struct FilterCond<'tcx> {
 }
 
 impl<'tcx> FilterCond<'tcx> {
-    fn to_string(self, cx: &'tcx LateContext<'tcx>, name: String, app: &mut Applicability) -> String {
-        let cond_str = snippet_with_applicability(cx, self.cond.span, "..", app); //AddDerefVisitor::deref_cond(cx, name, self.cond).unwrap_or("..".to_string());
+    fn to_string(self, cx: &LateContext<'tcx>, app: &mut Applicability) -> String {
+        let cond_sugg = Sugg::hir_with_applicability(cx, self.cond, "..", app);
         if self.inverted {
-            format!("!({})", cond_str)
+            format!("{}", !cond_sugg)
         } else {
-            cond_str.to_string()
+            format!("{}", cond_sugg)
         }
     }
 }
@@ -128,7 +128,7 @@ pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &Expr<'_>, arms: &'tcx [Ar
         then {
             let mut app = Applicability::MaybeIncorrect;
             let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
-            let cond_str = "foo".to_string(); //filter_cond.to_string(cx, name.to_string(), &mut app);
+            let cond_str = filter_cond.to_string(cx, &mut app);
             span_lint_and_sugg(cx,
                 MANUAL_FILTER,
                 expr.span,
