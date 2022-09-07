@@ -158,7 +158,7 @@ impl<'tcx> AddDerefVisitor<'tcx> {
     }
 }
 
-pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &'tcx Expr<'_>, arms: &'tcx [Arm<'_>], expr: &'tcx Expr<'_>) {
+pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &Expr<'_>, arms: &'tcx [Arm<'_>], expr: &Expr<'_>) {
     let expr_ctxt = expr.span.ctxt(); // what for?
     if_chain! {
         let ty = cx.typeck_results().expr_ty(expr);
