@@ -23,7 +23,7 @@ fn handle_arm<'tcx>(cx: &LateContext<'tcx>, arm: &'tcx Arm<'_>, ctxt: SyntaxCont
         if let ExprKind::Block(block, None) = arm.body.kind;
         if block.stmts.is_empty();
         if let Some(block_expr) = block.expr;
-        if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
+        if let ExprKind::If(Expr { kind: ExprKind::DropTemps(cond), ..}, then_expr, Some(else_expr)) = block_expr.kind;
         if let Some((then_option_cond, else_option_cond))
             = handle_if_or_else_expr(cx, arm.pat, then_expr).zip(handle_if_or_else_expr(cx, arm.pat, else_expr));
         if then_option_cond != else_option_cond;
