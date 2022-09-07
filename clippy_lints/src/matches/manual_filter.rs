@@ -1,5 +1,6 @@
 use clippy_utils::diagnostics::span_lint_and_sugg;
 use clippy_utils::source::snippet_with_applicability;
+use clippy_utils::sugg::Sugg;
 use clippy_utils::ty::is_type_diagnostic_item;
 use clippy_utils::{is_lang_ctor, match_def_path};
 use rustc_errors::Applicability;
@@ -7,7 +8,6 @@ use rustc_hir::LangItem::OptionNone;
 use rustc_hir::{Arm, BindingAnnotation, Expr, ExprKind, Pat, PatKind};
 use rustc_lint::LateContext;
 use rustc_span::{sym, SyntaxContext};
-use clippy_utils::sugg::Sugg;
 
 use super::manual_map::{try_parse_pattern, OptionPat};
 use super::needless_match::pat_same_as_expr;
@@ -15,17 +15,23 @@ use super::MANUAL_FILTER;
 
 type ArmInfo<'tcx> = (OptionPat<'tcx>, Option<FilterCond<'tcx>>);
 
-fn handle_arm<'tcx>(cx: &LateContext<'tcx>, arm: &'tcx Arm<'_>, ctxt: SyntaxContext) -> Option<ArmInfo<'tcx>> {
-    let option_pat = try_parse_pattern(cx, arm.pat, ctxt);
+fn handle_arm<'tcx>(
+    cx: &LateContext<'tcx>,
+    pat_opt: Option<&'tcx Pat<'_>>,
+    body: &'tcx Expr<'_>,
+    ctxt: SyntaxContext,
+) -> Option<ArmInfo<'tcx>> {
+    // the nested options are intentional here
+    let option_pat = pat_opt.map_or(Some(OptionPat::Wild), |pat| try_parse_pattern(cx, pat, ctxt));
     if_chain! {
         if let Some(OptionPat::Some { .. }) = option_pat;
-        if arm.guard.is_none();
-        if let ExprKind::Block(block, None) = arm.body.kind;
+        if let Some(pat) = pat_opt; // Always some because it needs to some to  `option_pat: OptionPat::Some{..}`
+        if let ExprKind::Block(block, None) = body.kind;
         if block.stmts.is_empty();
         if let Some(block_expr) = block.expr;
         if let ExprKind::If(Expr { kind: ExprKind::DropTemps(cond), ..}, then_expr, Some(else_expr)) = block_expr.kind;
         if let Some((then_option_cond, else_option_cond))
-            = handle_if_or_else_expr(cx, arm.pat, then_expr).zip(handle_if_or_else_expr(cx, arm.pat, else_expr));
+            = handle_if_or_else_expr(cx, pat, then_expr).zip(handle_if_or_else_expr(cx, pat, else_expr));
         if then_option_cond != else_option_cond;
         then {
             let inverted = then_option_cond == OptionCond::None;
@@ -114,20 +120,55 @@ fn arm_some_first_arm_none_second<'tcx>(
     }
 }
 
-pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &Expr<'_>, arms: &'tcx [Arm<'_>], expr: &Expr<'_>) {
-    let expr_ctxt = expr.span.ctxt(); // what for?
+pub(super) fn check_match<'tcx>(
+    cx: &LateContext<'tcx>,
+    scrutinee: &'tcx Expr<'_>,
+    arms: &'tcx [Arm<'_>],
+    expr: &'tcx Expr<'_>,
+) {
     if_chain! {
         let ty = cx.typeck_results().expr_ty(expr);
         if is_type_diagnostic_item(cx, ty, sym::Option);
         if arms.len() == 2;
-        if let Some((arm_some, _))
-            = handle_arm(cx, &arms[0], expr_ctxt).zip(handle_arm(cx, &arms[1], expr_ctxt))
-              .map(arm_some_first_arm_none_second);
+        if arms[0].guard.is_none();
+        if arms[1].guard.is_none();
+        then {
+            check(cx, expr, scrutinee, &arms[0].pat, &arms[0].body, Some(&arms[1].pat), &arms[1].body)
+        }
+    }
+}
+
+pub(super) fn check_if_let<'tcx>(
+    cx: &LateContext<'tcx>,
+    expr: &'tcx Expr<'_>,
+    let_pat: &'tcx Pat<'_>,
+    let_expr: &'tcx Expr<'_>,
+    then_expr: &'tcx Expr<'_>,
+    else_expr: &'tcx Expr<'_>,
+) {
+    check(cx, expr, let_expr, let_pat, then_expr, None, else_expr);
+}
+
+fn check<'tcx>(
+    cx: &LateContext<'tcx>,
+    expr: &'tcx Expr<'_>,
+    scrutinee: &'tcx Expr<'_>,
+    then_pat: &'tcx Pat<'_>,
+    then_body: &'tcx Expr<'_>,
+    else_pat: Option<&'tcx Pat<'_>>,
+    else_body: &'tcx Expr<'_>,
+) {
+    let expr_ctxt = expr.span.ctxt(); // what for?
+    if_chain! {
+            if let Some((arm_some, _))
+            = handle_arm(cx, Some(then_pat), then_body, expr_ctxt)
+            .zip(handle_arm(cx, else_pat, else_body, expr_ctxt))
+            .map(arm_some_first_arm_none_second);
         if let (OptionPat::Some {pattern, ..}, Some(filter_cond)) = arm_some;
         if let PatKind::Binding(BindingAnnotation::Unannotated, _, name, None) = pattern.kind;
         then {
             let mut app = Applicability::MaybeIncorrect;
-            let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
+            let var_str = snippet_with_applicability(cx, scrutinee.span, "..", &mut app);
             let cond_str = filter_cond.to_string(cx, &mut app);
             span_lint_and_sugg(cx,
                 MANUAL_FILTER,
