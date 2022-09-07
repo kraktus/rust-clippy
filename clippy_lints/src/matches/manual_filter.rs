@@ -114,50 +114,6 @@ fn arm_some_first_arm_none_second<'tcx>(
     }
 }
 
-/// Add deref operators (`*`) to all Paths matching `name`
-struct AddDerefVisitor<'tcx> {
-    name: String, // Possibly use `u32` from symbol instead?
-    cx: &'tcx LateContext<'tcx>,
-    deref_vec: Vec<usize>, // index of where to add `*`
-}
-
-impl<'tcx> Visitor<'tcx> for AddDerefVisitor<'tcx> {
-    fn visit_expr(&mut self, expr: &'tcx Expr<'_>) {
-        if let ExprKind::Path(qpath) = &expr.kind {
-            if let Some(def_id) = self.cx.qpath_res(&qpath, expr.hir_id).opt_def_id() {
-                if match_def_path(self.cx, def_id, &[&self.name]) {
-                    self.deref_vec.push(expr.span.lo().0 as usize);
-                }
-            }
-        }
-
-        walk_expr(self, expr);
-    }
-}
-
-impl<'tcx> AddDerefVisitor<'tcx> {
-    fn new(cx: &'tcx LateContext<'tcx>, name: String) -> Self {
-        Self {
-            cx,
-            name,
-            deref_vec: Vec::new(),
-        }
-    }
-
-    fn deref_cond(cx: &'tcx LateContext<'tcx>, name: String, expr: &'tcx Expr<'_>) -> Option<String> {
-        let mut add_deref_visitor = Self::new(cx, name);
-        add_deref_visitor.visit_expr(expr);
-        add_deref_visitor.deref_vec.sort();
-        let base_span_index = expr.span.lo().0 as usize;
-        snippet_opt(cx, expr.span).map(|mut snippet| {
-            for (i, deref_index) in add_deref_visitor.deref_vec.iter().enumerate() {
-                snippet.insert(base_span_index + deref_index + i, '*');
-            }
-            snippet
-        })
-    }
-}
-
 pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &Expr<'_>, arms: &'tcx [Arm<'_>], expr: &Expr<'_>) {
     let expr_ctxt = expr.span.ctxt(); // what for?
     if_chain! {
@@ -172,14 +128,13 @@ pub(crate) fn check<'tcx>(cx: &LateContext<'tcx>, ex: &Expr<'_>, arms: &'tcx [Ar
         then {
             let mut app = Applicability::MaybeIncorrect;
             let var_str = snippet_with_applicability(cx, ex.span, "..", &mut app);
-            //let i_cond_str = AddDerefVisitor::deref_cond(cx, name.to_string(), filter_cond.cond);
             let cond_str = "foo".to_string(); //filter_cond.to_string(cx, name.to_string(), &mut app);
             span_lint_and_sugg(cx,
                 MANUAL_FILTER,
                 expr.span,
                 "manual implementation of `Option::filter`",
                 "try",
-                format!("{}.filter(|{}| {})", var_str, name.name, cond_str),
+                format!("{}.filter(|&{}| {})", var_str, name.name, cond_str),
                 app
             )
         }
