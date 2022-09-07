@@ -53,6 +53,33 @@ fn check<'tcx>(
     else_pat: Option<&'tcx Pat<'_>>,
     else_body: &'tcx Expr<'_>,
 ) {
+    check_with(
+        cx,
+        expr,
+        scrutinee,
+        then_pat,
+        then_body,
+        else_pat,
+        else_body,
+        get_some_expr,
+        "map",
+    )
+}
+
+#[expect(clippy::too_many_lines)]
+pub(super) fn check_with<'tcx, F>(
+    cx: &LateContext<'tcx>,
+    expr: &'tcx Expr<'_>,
+    scrutinee: &'tcx Expr<'_>,
+    then_pat: &'tcx Pat<'_>,
+    then_body: &'tcx Expr<'_>,
+    else_pat: Option<&'tcx Pat<'_>>,
+    else_body: &'tcx Expr<'_>,
+    get_some_expr_fn: F,
+    function_name: &'static str,
+) where
+    F: Fn(&LateContext<'tcx>, &'tcx Pat<'_>, &'tcx Expr<'_>, SyntaxContext) -> Option<SomeExpr<'tcx>>,
+{
     let (scrutinee_ty, ty_ref_count, ty_mutability) =
         peel_mid_ty_refs_is_mutable(cx.typeck_results().expr_ty(scrutinee));
     if !(is_type_diagnostic_item(cx, scrutinee_ty, sym::Option)
@@ -86,7 +113,7 @@ fn check<'tcx>(
         return;
     }
 
-    let some_expr = match get_some_expr(cx, some_expr, false, expr_ctxt) {
+    let some_expr = match get_some_expr_fn(cx, some_pat, some_expr, expr_ctxt) {
         Some(expr) => expr,
         None => return,
     };
@@ -199,9 +226,9 @@ fn check<'tcx>(
         "manual implementation of `Option::map`",
         "try this",
         if else_pat.is_none() && is_else_clause(cx.tcx, expr) {
-            format!("{{ {}{}.map({}) }}", scrutinee_str, as_ref_str, body_str)
+            format!("{{ {}{}.{}({}) }}", scrutinee_str, as_ref_str, function_name, body_str)
         } else {
-            format!("{}{}.map({})", scrutinee_str, as_ref_str, body_str)
+            format!("{}{}.{}({})", scrutinee_str, as_ref_str, function_name, body_str)
         },
         app,
     );
@@ -235,9 +262,9 @@ pub(super) enum OptionPat<'a> {
     },
 }
 
-struct SomeExpr<'tcx> {
-    expr: &'tcx Expr<'tcx>,
-    needs_unsafe_block: bool,
+pub(super) struct SomeExpr<'tcx> {
+    pub expr: &'tcx Expr<'tcx>,
+    pub needs_unsafe_block: bool,
 }
 
 // Try to parse into a recognized `Option` pattern.
@@ -271,38 +298,46 @@ pub(super) fn try_parse_pattern<'tcx>(
 // Checks for an expression wrapped by the `Some` constructor. Returns the contained expression.
 fn get_some_expr<'tcx>(
     cx: &LateContext<'tcx>,
+    _: &'tcx Pat<'_>,
     expr: &'tcx Expr<'_>,
-    needs_unsafe_block: bool,
     ctxt: SyntaxContext,
 ) -> Option<SomeExpr<'tcx>> {
-    // TODO: Allow more complex expressions.
-    match expr.kind {
-        ExprKind::Call(
-            Expr {
-                kind: ExprKind::Path(ref qpath),
-                ..
-            },
-            [arg],
-        ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => Some(SomeExpr {
-            expr: arg,
-            needs_unsafe_block,
-        }),
-        ExprKind::Block(
-            Block {
-                stmts: [],
-                expr: Some(expr),
-                rules,
-                ..
-            },
-            _,
-        ) => get_some_expr(
-            cx,
-            expr,
-            needs_unsafe_block || *rules == BlockCheckMode::UnsafeBlock(UnsafeSource::UserProvided),
-            ctxt,
-        ),
-        _ => None,
+    fn get_some_expr_internal<'tcx>(
+        cx: &LateContext<'tcx>,
+        expr: &'tcx Expr<'_>,
+        needs_unsafe_block: bool,
+        ctxt: SyntaxContext,
+    ) -> Option<SomeExpr<'tcx>> {
+        // TODO: Allow more complex expressions.
+        match expr.kind {
+            ExprKind::Call(
+                Expr {
+                    kind: ExprKind::Path(ref qpath),
+                    ..
+                },
+                [arg],
+            ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => Some(SomeExpr {
+                expr: arg,
+                needs_unsafe_block,
+            }),
+            ExprKind::Block(
+                Block {
+                    stmts: [],
+                    expr: Some(expr),
+                    rules,
+                    ..
+                },
+                _,
+            ) => get_some_expr_internal(
+                cx,
+                expr,
+                needs_unsafe_block || *rules == BlockCheckMode::UnsafeBlock(UnsafeSource::UserProvided),
+                ctxt,
+            ),
+            _ => None,
+        }
     }
+    get_some_expr_internal(cx, expr, false, ctxt)
 }
 
 // Checks for the `None` value.

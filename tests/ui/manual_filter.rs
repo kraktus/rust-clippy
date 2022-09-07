@@ -69,8 +69,9 @@ fn main() {
         _ => None,
     };
 
-    
-    match Some(6) { // Not supported for now, but it could lint and remove `ref`, because this pattern only work if `x` implements the `Copy` trait.
+    match Some(6) {
+        // Not supported for now, but it could lint and remove `ref`, because this pattern only work if `x` implements
+        // the `Copy` trait.
         Some(ref x) => {
             if x > &0 {
                 Some(x)
@@ -94,21 +95,19 @@ fn main() {
     };
 
     if let Some(x) = Some(7) {
-        if external_cond {
-                Some(x)
-            } else {
-                None
-            }
+        if external_cond { Some(x) } else { None }
     } else {
         None
     };
 
     match &Some(8) {
-        &Some(x) => if x != 0 {
+        &Some(x) => {
+            if x != 0 {
                 Some(x)
             } else {
                 None
-            },
+            }
+        },
         _ => None,
     };
 }
