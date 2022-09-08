@@ -170,7 +170,7 @@ LL | |     A(bool),
 LL | |     B([u128; 4000]),
    | |     --------------- the largest variant contains at least 64000 bytes
 LL | | }
-   | |_^ the entire enum is at least 64008 bytes
+   | |_^ the entire enum is at least 64016 bytes
    |
 note: boxing a variant would require the type no longer be `Copy`
   --> $DIR/large_enum_variant.rs:102:6
@@ -192,7 +192,7 @@ LL | |     A(bool),
 LL | |     B([u128; 4000]),
    | |     --------------- the largest variant contains at least 64000 bytes
 LL | | }
-   | |_^ the entire enum is at least 64008 bytes
+   | |_^ the entire enum is at least 64016 bytes
    |
 note: boxing a variant would require the type no longer be `Copy`
   --> $DIR/large_enum_variant.rs:107:6
