@@ -4,7 +4,7 @@ use clippy_utils::source::{snippet_with_applicability, snippet_with_context};
 use clippy_utils::ty::{is_type_diagnostic_item, peel_mid_ty_refs_is_mutable, type_is_unsafe_function};
 use clippy_utils::{
     can_move_expr_to_closure, is_else_clause, is_lang_ctor, is_lint_allowed, path_to_local_id, peel_blocks,
-    peel_hir_expr_refs, peel_hir_expr_while, CaptureKind,
+    peel_hir_expr_refs, peel_hir_expr_while, CaptureKind, sugg::Sugg,
 };
 use rustc_ast::util::parser::PREC_POSTFIX;
 use rustc_errors::Applicability;
@@ -15,7 +15,6 @@ use rustc_hir::{
 };
 use rustc_lint::LateContext;
 use rustc_span::{sym, SyntaxContext};
-
 use super::MANUAL_MAP;
 
 pub(super) fn check_match<'tcx>(
@@ -177,7 +176,7 @@ pub(super) fn check_with<'tcx, F>(
     };
 
     // let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
-    let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
+    let closure_expr_snip = Sugg::hir_with_context(cx, some_expr.expr, expr_ctxt, "..", &mut app);
     let body_str = if let PatKind::Binding(annotation, id, some_binding, None) = some_pat.kind {
         if_chain! {
             if !some_expr.needs_unsafe_block;
