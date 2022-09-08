@@ -176,6 +176,8 @@ pub(super) fn check_with<'tcx, F>(
         scrutinee_str.into()
     };
 
+    // let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
+    let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
     let body_str = if let PatKind::Binding(annotation, id, some_binding, None) = some_pat.kind {
         if_chain! {
             if !some_expr.needs_unsafe_block;
@@ -197,22 +199,21 @@ pub(super) fn check_with<'tcx, F>(
                 } else {
                     ""
                 };
-                let expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
+                
                 if some_expr.needs_unsafe_block {
-                    format!("|{}{}| unsafe {{ {} }}", annotation, some_binding, expr_snip)
+                    format!("|{}{}| unsafe {{ {} }}", annotation, some_binding, closure_expr_snip)
                 } else {
-                    format!("|{}{}| {}", annotation, some_binding, expr_snip)
+                    format!("|{}{}| {}", annotation, some_binding, closure_expr_snip)
                 }
             }
         }
     } else if !is_wild_none && explicit_ref.is_none() {
         // TODO: handle explicit reference annotations.
         let pat_snip = snippet_with_context(cx, some_pat.span, expr_ctxt, "..", &mut app).0;
-        let expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
         if some_expr.needs_unsafe_block {
-            format!("|{}| unsafe {{ {} }}", pat_snip, expr_snip)
+            format!("|{}| unsafe {{ {} }}", pat_snip, closure_expr_snip)
         } else {
-            format!("|{}| {}", pat_snip, expr_snip)
+            format!("|{}| {}", pat_snip, closure_expr_snip)
         }
     } else {
         // Refutable bindings and mixed reference annotations can't be handled by `map`.
@@ -265,6 +266,7 @@ pub(super) enum OptionPat<'a> {
 pub(super) struct SomeExpr<'tcx> {
     pub expr: &'tcx Expr<'tcx>,
     pub needs_unsafe_block: bool,
+    // pub need_to_be_negated: bool, // for `manual_filter` lint
 }
 
 // Try to parse into a recognized `Option` pattern.
