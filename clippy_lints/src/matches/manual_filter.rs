@@ -114,11 +114,7 @@ fn get_cond_expr<'tcx>(
             let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
             visitor_cond.visit_expr(block_expr);
             if dbg!(visitor_cond.is_equal_to_pat_bind) {
-                Some(SomeExpr {
-                    expr: cond.peel_drop_temps(),
-                    needs_unsafe_block: visitor_cond.needs_unsafe_block
-
-                })
+                Some(SomeExpr::new_no_negated(cond.peel_drop_temps(),visitor_cond.needs_unsafe_block))
             } else {
                 None
             }

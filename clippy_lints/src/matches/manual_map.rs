@@ -265,7 +265,17 @@ pub(super) enum OptionPat<'a> {
 pub(super) struct SomeExpr<'tcx> {
     pub expr: &'tcx Expr<'tcx>,
     pub needs_unsafe_block: bool,
-    // pub need_to_be_negated: bool, // for `manual_filter` lint
+    pub need_to_be_negated: bool, // for `manual_filter` lint
+}
+
+impl<'tcx> SomeExpr<'tcx> {
+    pub fn new_no_negated(expr: &'tcx Expr<'tcx>, needs_unsafe_block: bool) -> Self {
+        Self {
+            expr,
+            needs_unsafe_block,
+            need_to_be_negated: false
+        }
+    }
 }
 
 // Try to parse into a recognized `Option` pattern.
@@ -317,10 +327,8 @@ fn get_some_expr<'tcx>(
                     ..
                 },
                 [arg],
-            ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => Some(SomeExpr {
-                expr: arg,
-                needs_unsafe_block,
-            }),
+            ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => Some(
+            SomeExpr::new_no_negated(arg,needs_unsafe_block)),
             ExprKind::Block(
                 Block {
                     stmts: [],
