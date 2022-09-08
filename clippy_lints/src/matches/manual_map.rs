@@ -1,10 +1,11 @@
+use super::MANUAL_MAP;
 use crate::{map_unit_fn::OPTION_MAP_UNIT_FN, matches::MATCH_AS_REF};
 use clippy_utils::diagnostics::span_lint_and_sugg;
 use clippy_utils::source::{snippet_with_applicability, snippet_with_context};
 use clippy_utils::ty::{is_type_diagnostic_item, peel_mid_ty_refs_is_mutable, type_is_unsafe_function};
 use clippy_utils::{
     can_move_expr_to_closure, is_else_clause, is_lang_ctor, is_lint_allowed, path_to_local_id, peel_blocks,
-    peel_hir_expr_refs, peel_hir_expr_while, CaptureKind, sugg::Sugg,
+    peel_hir_expr_refs, peel_hir_expr_while, sugg::Sugg, CaptureKind,
 };
 use rustc_ast::util::parser::PREC_POSTFIX;
 use rustc_errors::Applicability;
@@ -15,7 +16,6 @@ use rustc_hir::{
 };
 use rustc_lint::LateContext;
 use rustc_span::{sym, SyntaxContext};
-use super::MANUAL_MAP;
 
 pub(super) fn check_match<'tcx>(
     cx: &LateContext<'tcx>,
@@ -175,8 +175,9 @@ pub(super) fn check_with<'tcx, F>(
         scrutinee_str.into()
     };
 
-    // let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut app).0;
-    let closure_expr_snip = Sugg::hir_with_context(cx, some_expr.expr, expr_ctxt, "..", &mut app);
+    // let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut
+    // app).0;
+    let closure_expr_snip = some_expr.to_snippet_with_context(cx, expr_ctxt, &mut app);
     let body_str = if let PatKind::Binding(annotation, id, some_binding, None) = some_pat.kind {
         if_chain! {
             if !some_expr.needs_unsafe_block;
@@ -198,7 +199,7 @@ pub(super) fn check_with<'tcx, F>(
                 } else {
                     ""
                 };
-                
+
                 if some_expr.needs_unsafe_block {
                     format!("|{}{}| unsafe {{ {} }}", annotation, some_binding, closure_expr_snip)
                 } else {
@@ -265,7 +266,7 @@ pub(super) enum OptionPat<'a> {
 pub(super) struct SomeExpr<'tcx> {
     pub expr: &'tcx Expr<'tcx>,
     pub needs_unsafe_block: bool,
-    pub need_to_be_negated: bool, // for `manual_filter` lint
+    pub needs_negated: bool, // for `manual_filter` lint
 }
 
 impl<'tcx> SomeExpr<'tcx> {
@@ -273,8 +274,18 @@ impl<'tcx> SomeExpr<'tcx> {
         Self {
             expr,
             needs_unsafe_block,
-            need_to_be_negated: false
+            needs_negated: false,
         }
+    }
+
+    pub fn to_snippet_with_context(
+        &self,
+        cx: &LateContext<'tcx>,
+        ctxt: SyntaxContext,
+        app: &mut Applicability,
+    ) -> Sugg<'tcx> {
+        let sugg = Sugg::hir_with_context(cx, self.expr, ctxt, "..", app);
+        if self.needs_negated { !sugg } else { sugg }
     }
 }
 
@@ -327,8 +338,9 @@ fn get_some_expr<'tcx>(
                     ..
                 },
                 [arg],
-            ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => Some(
-            SomeExpr::new_no_negated(arg,needs_unsafe_block)),
+            ) if ctxt == expr.span.ctxt() && is_lang_ctor(cx, qpath, OptionSome) => {
+                Some(SomeExpr::new_no_negated(arg, needs_unsafe_block))
+            },
             ExprKind::Block(
                 Block {
                     stmts: [],

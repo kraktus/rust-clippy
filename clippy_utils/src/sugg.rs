@@ -1,7 +1,9 @@
 //! Contains utility functions to generate suggestions.
 #![deny(clippy::missing_docs_in_private_items)]
 
-use crate::source::{snippet, snippet_opt, snippet_with_applicability, snippet_with_context, snippet_with_macro_callsite};
+use crate::source::{
+    snippet, snippet_opt, snippet_with_applicability, snippet_with_context, snippet_with_macro_callsite,
+};
 use crate::ty::expr_sig;
 use crate::{get_parent_expr_for_hir, higher};
 use rustc_ast::util::parser::AssocOp;

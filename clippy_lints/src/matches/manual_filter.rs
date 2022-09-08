@@ -17,35 +17,35 @@ use super::MANUAL_FILTER;
 
 type ArmInfo<'tcx> = (OptionPat<'tcx>, Option<FilterCond<'tcx>>);
 
-fn handle_arm<'tcx>(
-    cx: &LateContext<'tcx>,
-    pat_opt: Option<&'tcx Pat<'_>>,
-    body: &'tcx Expr<'_>,
-    ctxt: SyntaxContext,
-) -> Option<ArmInfo<'tcx>> {
-    // the nested options are intentional here
-    let option_pat = pat_opt.map_or(Some(OptionPat::Wild), |pat| try_parse_pattern(cx, pat, ctxt));
-    if_chain! {
-        if let Some(OptionPat::Some { .. }) = option_pat;
-        if let Some(pat) = pat_opt; // Always some because it needs to some to  `option_pat: OptionPat::Some{..}`
-        if let ExprKind::Block(block, None) = body.kind;
-        if block.stmts.is_empty();
-        if let Some(block_expr) = block.expr;
-        if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
-        if let Some((then_option_cond, else_option_cond))
-            = handle_if_or_else_expr(cx, pat, then_expr).zip(handle_if_or_else_expr(cx, pat, else_expr));
-        if then_option_cond != else_option_cond;
-        then {
-            let inverted = then_option_cond == OptionCond::None;
-            let filter_cond = FilterCond {
-                inverted,
-                cond: cond.peel_drop_temps()
-            };
-            return option_pat.map(|x| (x, Some(filter_cond)))
-        }
-    }
-    option_pat.map(|x| (x, None))
-}
+// fn handle_arm<'tcx>(
+//     cx: &LateContext<'tcx>,
+//     pat_opt: Option<&'tcx Pat<'_>>,
+//     body: &'tcx Expr<'_>,
+//     ctxt: SyntaxContext,
+// ) -> Option<ArmInfo<'tcx>> {
+//     // the nested options are intentional here
+//     let option_pat = pat_opt.map_or(Some(OptionPat::Wild), |pat| try_parse_pattern(cx, pat,
+// ctxt));     if_chain! {
+//         if let Some(OptionPat::Some { .. }) = option_pat;
+//         if let Some(pat) = pat_opt; // Always some because it needs to some to  `option_pat:
+// OptionPat::Some{..}`         if let ExprKind::Block(block, None) = body.kind;
+//         if block.stmts.is_empty();
+//         if let Some(block_expr) = block.expr;
+//         if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
+//         if let Some((then_option_cond, else_option_cond))
+//             = handle_if_or_else_expr(cx, pat, then_expr).zip(handle_if_or_else_expr(cx, pat,
+// else_expr));         if then_option_cond != else_option_cond;
+//         then {
+//             let inverted = then_option_cond == OptionCond::None;
+//             let filter_cond = FilterCond {
+//                 inverted,
+//                 cond: cond.peel_drop_temps()
+//             };
+//             return option_pat.map(|x| (x, Some(filter_cond)))
+//         }
+//     }
+//     option_pat.map(|x| (x, None))
+// }
 
 struct CondVisitor<'a, 'tcx> {
     cx: &'a LateContext<'tcx>,
@@ -108,13 +108,23 @@ fn get_cond_expr<'tcx>(
         if let ExprKind::Block(block, None) = expr.kind;
         if block.stmts.is_empty();
         if let Some(block_expr) = block.expr;
-        if let ExprKind::If(cond, ..) = block_expr.kind; // top level if
+        if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
         if let PatKind::Binding(_,target, ..) = pat.kind;
+        if let (then_option_cond, else_option_cond)
+            = (handle_if_or_else_expr(cx, target, ctxt, then_expr),
+                handle_if_or_else_expr(cx, target, ctxt, else_expr));
+        if then_option_cond != else_option_cond; // check that one expr resolves to `Some(x)`, the other to `None`
         then {
+            // we only need the visitor to look for unsafe block.
+            // TODO could probably be refactored not to need a visitor altogether
             let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
             visitor_cond.visit_expr(block_expr);
             if dbg!(visitor_cond.is_equal_to_pat_bind) {
-                Some(SomeExpr::new_no_negated(cond.peel_drop_temps(),visitor_cond.needs_unsafe_block))
+                Some(SomeExpr {
+                    expr: cond.peel_drop_temps(),
+                    needs_unsafe_block: visitor_cond.needs_unsafe_block,
+                    needs_negated: !then_option_cond // if the `if_expr` resolves to `None`, we need to negate the cond
+                })
             } else {
                 None
             }
@@ -125,41 +135,37 @@ fn get_cond_expr<'tcx>(
 }
 
 // see doc for `handle_if_or_else_expr`
-#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
-enum OptionCond {
-    None,
-    Some,
-}
+// #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
+// enum OptionCond {
+//     None,
+//     Some,
+// }
 
+// ASSUME we already know the expression resolves to an `Option`
 // function called for each <ifelse> expression:
 // Some(x) => if <cond> {
 //    <ifelse>
 // } else {
 //    <ifelse>
 // }
-// If <ifelse> resolves to `Some(x)` return Some(OptionCond::Some)
-// If <ifelse> resolves to `None, return Some(OptionCond::None)
-// If the expression is something else return `None`
+// If <ifelse> resolves to `Some(x)` return `true`
+// otherwise `false
 fn handle_if_or_else_expr<'tcx>(
     cx: &LateContext<'_>,
-    pat: &Pat<'_>,
+    target: HirId,
+    ctxt: SyntaxContext,
     if_or_else_expr: &'tcx Expr<'_>,
-) -> Option<OptionCond> {
+) -> bool {
+    // let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
     if_chain! {
-        if let ExprKind::Block(block, None) = if_or_else_expr.kind;
-        if block.stmts.is_empty();
-        if let Some(inner_if_or_else_expr) = block.expr;
-        then {
-        if pat_same_as_expr(pat, inner_if_or_else_expr) {
-            return Some(OptionCond::Some)
-        } else if let ExprKind::Path(ref then_qpath) = inner_if_or_else_expr.kind {
-                if is_lang_ctor(cx, then_qpath, OptionNone) {
-                    return Some(OptionCond::None);
-                }
-            }
+            if let ExprKind::Block(block, None) = if_or_else_expr.kind;
+            if block.stmts.is_empty(); // could we handle side effects?
+            if let Some(inner_if_or_else_expr) = block.expr;
+            then {
+            return path_to_local_id(inner_if_or_else_expr, target)
         }
     }
-    None
+    false
 }
 
 // Contains the <cond> part of the snippet below
