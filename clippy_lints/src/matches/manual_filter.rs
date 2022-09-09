@@ -110,62 +110,37 @@ fn get_cond_expr<'tcx>(
         if let Some(block_expr) = block.expr;
         if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
         if let PatKind::Binding(_,target, ..) = pat.kind;
-        if let (then_option_cond, else_option_cond)
-            = (handle_if_or_else_expr(cx, target, ctxt, then_expr),
-                handle_if_or_else_expr(cx, target, ctxt, else_expr));
-        if then_option_cond != else_option_cond; // check that one expr resolves to `Some(x)`, the other to `None`
+        if let (then_visitor_, else_visitor)
+            = dbg!((handle_if_or_else_expr(cx, target, ctxt, then_expr),
+                handle_if_or_else_expr(cx, target, ctxt, else_expr)));
+        if then_visitor_.is_equal_to_pat_bind != else_visitor.is_equal_to_pat_bind; // check that one expr resolves to `Some(x)`, the other to `None`
         then {
-            // we only need the visitor to look for unsafe block.
-            // TODO could probably be refactored not to need a visitor altogether
-            let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
-            visitor_cond.visit_expr(block_expr);
-            if dbg!(visitor_cond.is_equal_to_pat_bind) {
-                Some(SomeExpr {
+            Some(SomeExpr {
                     expr: cond.peel_drop_temps(),
-                    needs_unsafe_block: visitor_cond.needs_unsafe_block,
-                    needs_negated: !then_option_cond // if the `if_expr` resolves to `None`, we need to negate the cond
+                    needs_unsafe_block: then_visitor_.needs_unsafe_block,
+                    needs_negated: !then_visitor_.is_equal_to_pat_bind // if the `then_expr` resolves to `None`, we need to negate the cond
                 })
-            } else {
-                None
-            }
+            } 
         } else {
             None
         }
     }
 }
 
-// see doc for `handle_if_or_else_expr`
-// #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
-// enum OptionCond {
-//     None,
-//     Some,
-// }
-
-// ASSUME we already know the expression resolves to an `Option`
 // function called for each <ifelse> expression:
 // Some(x) => if <cond> {
 //    <ifelse>
 // } else {
 //    <ifelse>
 // }
-// If <ifelse> resolves to `Some(x)` return `true`
-// otherwise `false
 fn handle_if_or_else_expr<'tcx>(
     cx: &LateContext<'_>,
     target: HirId,
     ctxt: SyntaxContext,
     if_or_else_expr: &'tcx Expr<'_>,
-) -> bool {
-    // let mut visitor_cond = CondVisitor::new(cx, target, ctxt);
-    if_chain! {
-            if let ExprKind::Block(block, None) = if_or_else_expr.kind;
-            if block.stmts.is_empty(); // could we handle side effects?
-            if let Some(inner_if_or_else_expr) = block.expr;
-            then {
-            return path_to_local_id(inner_if_or_else_expr, target)
-        }
-    }
-    false
+) -> CondVisitor {
+    let mut cond_visitor = CondVisitor::new(cx, target, ctxt);
+    cond_visitor.visit_expr(if_or_else_expr);
 }
 
 // Contains the <cond> part of the snippet below
