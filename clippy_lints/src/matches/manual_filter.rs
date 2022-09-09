@@ -1,73 +1,19 @@
 use clippy_utils::diagnostics::span_lint_and_sugg;
-use clippy_utils::source::snippet_with_applicability;
-use clippy_utils::sugg::Sugg;
 use clippy_utils::ty::is_type_diagnostic_item;
 use clippy_utils::{is_lang_ctor, path_to_local_id};
-use rustc_errors::Applicability;
 use rustc_hir::intravisit::{walk_expr, Visitor};
-use rustc_hir::LangItem::OptionNone;
 use rustc_hir::LangItem::OptionSome;
-use rustc_hir::{Arm, BindingAnnotation, Block, BlockCheckMode, Expr, ExprKind, HirId, Pat, PatKind, UnsafeSource};
+use rustc_hir::{Arm, Block, BlockCheckMode, Expr, ExprKind, HirId, Pat, PatKind, UnsafeSource};
 use rustc_lint::LateContext;
 use rustc_span::{sym, SyntaxContext};
 
-use super::manual_map::{check_with, try_parse_pattern, OptionPat, SomeExpr};
-use super::needless_match::pat_same_as_expr;
+use super::manual_map::{check_with, SomeExpr};
 use super::MANUAL_FILTER;
 
-type ArmInfo<'tcx> = (OptionPat<'tcx>, Option<FilterCond<'tcx>>);
+#[derive(Default)]
+struct NeedsUnsafeBlock(pub bool);
 
-// fn handle_arm<'tcx>(
-//     cx: &LateContext<'tcx>,
-//     pat_opt: Option<&'tcx Pat<'_>>,
-//     body: &'tcx Expr<'_>,
-//     ctxt: SyntaxContext,
-// ) -> Option<ArmInfo<'tcx>> {
-//     // the nested options are intentional here
-//     let option_pat = pat_opt.map_or(Some(OptionPat::Wild), |pat| try_parse_pattern(cx, pat,
-// ctxt));     if_chain! {
-//         if let Some(OptionPat::Some { .. }) = option_pat;
-//         if let Some(pat) = pat_opt; // Always some because it needs to some to  `option_pat:
-// OptionPat::Some{..}`         if let ExprKind::Block(block, None) = body.kind;
-//         if block.stmts.is_empty();
-//         if let Some(block_expr) = block.expr;
-//         if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
-//         if let Some((then_option_cond, else_option_cond))
-//             = handle_if_or_else_expr(cx, pat, then_expr).zip(handle_if_or_else_expr(cx, pat,
-// else_expr));         if then_option_cond != else_option_cond;
-//         then {
-//             let inverted = then_option_cond == OptionCond::None;
-//             let filter_cond = FilterCond {
-//                 inverted,
-//                 cond: cond.peel_drop_temps()
-//             };
-//             return option_pat.map(|x| (x, Some(filter_cond)))
-//         }
-//     }
-//     option_pat.map(|x| (x, None))
-// }
-
-struct CondVisitor<'a, 'tcx> {
-    cx: &'a LateContext<'tcx>,
-    target: HirId,
-    ctxt: SyntaxContext,
-    is_equal_to_pat_bind: bool,
-    needs_unsafe_block: bool,
-}
-
-impl<'a, 'tcx> CondVisitor<'a, 'tcx> {
-    fn new(cx: &'a LateContext<'tcx>, target: HirId, ctxt: SyntaxContext) -> Self {
-        Self {
-            cx,
-            target,
-            ctxt,
-            is_equal_to_pat_bind: false,
-            needs_unsafe_block: false,
-        }
-    }
-}
-
-impl<'a, 'tcx> Visitor<'tcx> for CondVisitor<'a, 'tcx> {
+impl<'tcx> Visitor<'tcx> for NeedsUnsafeBlock {
     fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
         match expr.kind {
             ExprKind::Block(
@@ -76,18 +22,9 @@ impl<'a, 'tcx> Visitor<'tcx> for CondVisitor<'a, 'tcx> {
                     ..
                 },
                 _,
-            ) => self.needs_unsafe_block = true,
-            ExprKind::Call(
-                Expr {
-                    kind: ExprKind::Path(ref qpath),
-                    ..
-                },
-                [arg],
-            ) if self.ctxt == expr.span.ctxt() && is_lang_ctor(self.cx, qpath, OptionSome) => {
-                if path_to_local_id(arg, self.target) {
-                    self.is_equal_to_pat_bind = true;
-                    return;
-                }
+            ) => {
+                self.0 = true;
+                return;
             },
             _ => walk_expr(self, expr),
         }
@@ -105,26 +42,39 @@ fn get_cond_expr<'tcx>(
     ctxt: SyntaxContext,
 ) -> Option<SomeExpr<'tcx>> {
     if_chain! {
-        if let ExprKind::Block(block, None) = expr.kind;
-        if block.stmts.is_empty();
-        if let Some(block_expr) = block.expr;
+        if let Some(block_expr) = peels_blocks_incl_unsafe_opt(expr);
         if let ExprKind::If(cond, then_expr, Some(else_expr)) = block_expr.kind;
         if let PatKind::Binding(_,target, ..) = pat.kind;
-        if let (then_visitor_, else_visitor)
-            = dbg!((handle_if_or_else_expr(cx, target, ctxt, then_expr),
-                handle_if_or_else_expr(cx, target, ctxt, else_expr)));
-        if then_visitor_.is_equal_to_pat_bind != else_visitor.is_equal_to_pat_bind; // check that one expr resolves to `Some(x)`, the other to `None`
+        if let (then_visitor, else_visitor)
+            = (handle_if_or_else_expr(cx, target, ctxt, then_expr),
+                handle_if_or_else_expr(cx, target, ctxt, else_expr));
+        if then_visitor != else_visitor; // check that one expr resolves to `Some(x)`, the other to `None`
         then {
-            Some(SomeExpr {
-                    expr: cond.peel_drop_temps(),
-                    needs_unsafe_block: then_visitor_.needs_unsafe_block,
-                    needs_negated: !then_visitor_.is_equal_to_pat_bind // if the `then_expr` resolves to `None`, we need to negate the cond
+            let mut needs_unsafe_block = NeedsUnsafeBlock::default();
+            needs_unsafe_block.visit_expr(expr);
+            return Some(SomeExpr {
+                    expr: peels_blocks_incl_unsafe(cond.peel_drop_temps()),
+                    needs_unsafe_block: needs_unsafe_block.0,
+                    needs_negated: !then_visitor // if the `then_expr` resolves to `None`, need to negate the cond
                 })
-            } 
-        } else {
-            None
+            }
+    };
+    None
+}
+
+fn peels_blocks_incl_unsafe_opt<'a>(expr: &'a Expr<'a>) -> Option<&'a Expr<'a>> {
+    // we don't want to use `peel_blocks` here because we don't care if the block is unsafe, it's
+    // checked by `NeedsUnsafeBlock`
+    if let ExprKind::Block(block, None) = expr.kind {
+        if block.stmts.is_empty() {
+            return block.expr;
         }
-    }
+    };
+    None
+}
+
+fn peels_blocks_incl_unsafe<'a>(expr: &'a Expr<'a>) -> &'a Expr<'a> {
+    peels_blocks_incl_unsafe_opt(expr).unwrap_or(expr)
 }
 
 // function called for each <ifelse> expression:
@@ -133,51 +83,37 @@ fn get_cond_expr<'tcx>(
 // } else {
 //    <ifelse>
 // }
+// Returns true if <ifelse> resolves to `Some(x)`, `false` otherwise
 fn handle_if_or_else_expr<'tcx>(
     cx: &LateContext<'_>,
     target: HirId,
     ctxt: SyntaxContext,
     if_or_else_expr: &'tcx Expr<'_>,
-) -> CondVisitor {
-    let mut cond_visitor = CondVisitor::new(cx, target, ctxt);
-    cond_visitor.visit_expr(if_or_else_expr);
-}
-
-// Contains the <cond> part of the snippet below
-// if `inverted` is set to `true`, then `x` and `None` are swapped
-// Some(x) => if <cond> {
-//    x
-// } else {
-//    None
-// }
-#[derive(Debug)]
-struct FilterCond<'tcx> {
-    cond: &'tcx Expr<'tcx>,
-    inverted: bool,
-}
-
-impl<'tcx> FilterCond<'tcx> {
-    fn to_string(self, cx: &LateContext<'tcx>, app: &mut Applicability) -> String {
-        let cond_sugg = Sugg::hir_with_applicability(cx, self.cond, "..", app);
-        if self.inverted {
-            format!("{}", !cond_sugg)
-        } else {
-            format!("{}", cond_sugg)
+) -> bool {
+    if let Some(inner_expr) = peels_blocks_incl_unsafe_opt(if_or_else_expr) {
+        // there can be not statements in the block as they would be removed when switching to `.filter`
+        if let ExprKind::Call(
+            Expr {
+                kind: ExprKind::Path(ref qpath),
+                ..
+            },
+            [arg],
+        ) = inner_expr.kind
+        {
+            return ctxt == if_or_else_expr.span.ctxt()
+                && is_lang_ctor(cx, qpath, OptionSome)
+                && path_to_local_id(arg, target);
         }
-    }
+    };
+    false
 }
 
-// return (arm1, arm2), no matter how the original match was defined
-// <Some(x) => {...}> = arm1
-// <None | _ => {...}> = arm2
-fn arm_some_first_arm_none_second<'tcx>(
-    (first_arm, second_arm): (ArmInfo<'tcx>, ArmInfo<'tcx>),
-) -> (ArmInfo<'tcx>, ArmInfo<'tcx>) {
-    if let (OptionPat::None | OptionPat::Wild, _) = second_arm {
-        (first_arm, second_arm)
-    } else {
-        (second_arm, first_arm)
-    }
+// given the closure: `|<pattern>| <expr>`
+// returns `|&<pattern>| <expr>`
+fn insert_ampersand(body_str: String) -> String {
+    let mut with_ampersand = body_str.clone();
+    with_ampersand.insert(1, '&');
+    with_ampersand
 }
 
 pub(super) fn check_match<'tcx>(
@@ -218,7 +154,7 @@ fn check<'tcx>(
     else_pat: Option<&'tcx Pat<'_>>,
     else_body: &'tcx Expr<'_>,
 ) {
-    check_with(
+    if let Some(sugg_info) = check_with(
         cx,
         expr,
         scrutinee,
@@ -227,28 +163,30 @@ fn check<'tcx>(
         else_pat,
         else_body,
         get_cond_expr,
-        "filter",
-    )
-    // let expr_ctxt = expr.span.ctxt(); // what for?
-    // if_chain! {
-    //         if let Some((arm_some, _))
-    //         = handle_arm(cx, Some(then_pat), then_body, expr_ctxt)
-    //         .zip(handle_arm(cx, else_pat, else_body, expr_ctxt))
-    //         .map(arm_some_first_arm_none_second);
-    //     if let (OptionPat::Some {pattern, ..}, Some(filter_cond)) = arm_some;
-    //     if let PatKind::Binding(BindingAnnotation::Unannotated, _, name, None) = pattern.kind;
-    //     then {
-    //         let mut app = Applicability::MaybeIncorrect;
-    //         let var_str = snippet_with_applicability(cx, scrutinee.span, "..", &mut app);
-    //         let cond_str = filter_cond.to_string(cx, &mut app);
-    //         span_lint_and_sugg(cx,
-    //             MANUAL_FILTER,
-    //             expr.span,
-    //             "manual implementation of `Option::filter`",
-    //             "try",
-    //             format!("{}.filter(|&{}| {})", var_str, name.name, cond_str),
-    //             app
-    //         )
-    //     }
-    // }
+    ){
+
+    span_lint_and_sugg(
+        cx,
+        MANUAL_FILTER,
+        expr.span,
+        "manual implementation of `Option::filter`",
+        "try this",
+        if sugg_info.needs_brackets {
+            format!(
+                "{{ {}{}.filter({}) }}",
+                sugg_info.scrutinee_str,
+                sugg_info.as_ref_str,
+                insert_ampersand(sugg_info.body_str)
+            )
+        } else {
+            format!(
+                "{}{}.filter({})",
+                sugg_info.scrutinee_str,
+                sugg_info.as_ref_str,
+                insert_ampersand(sugg_info.body_str)
+            )
+        },
+        sugg_info.app,
+    );
+}
 }
