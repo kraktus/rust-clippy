@@ -1,5 +1,7 @@
-#![feature(lint_reasons)]
+// run-rustfix
+
 #![warn(clippy::manual_filter)]
+#![allow(unused_variables, dead_code)]
 
 fn main() {
     match Some(0) {
@@ -135,7 +137,7 @@ fn main() {
         };
     }
 
-    #[expect(clippy::blocks-in-if-conditions)]
+    #[allow(clippy::blocks_in_if_conditions)]
     match Some(11) {
         // Lint, statement is preserved by `.filter`
         Some(x) => {
@@ -151,7 +153,6 @@ fn main() {
         None => None,
     };
 
-    #[expect(clippy::blocks-in-if-conditions)]
     match Some(12) {
         // Don't Lint, statement is lost by `.filter`
         Some(x) => {
@@ -194,6 +195,48 @@ fn main() {
     let _ = match Some(15) {
         Some(x) => unsafe {
             if f(x) { Some(x) } else { None }
+        },
+        None => None,
+    };
+
+    #[allow(clippy::redundant_pattern_matching)]
+    if let Some(_) = Some(16) {
+        Some(16)
+    } else if let Some(x) = Some(16) {
+        // Lint starting from here
+        if x % 2 == 0 { Some(x) } else { None }
+    } else {
+        None
+    };
+
+    match Some((17, 17)) {
+        // Not linted for now could be
+        Some((x, y)) => {
+            if y != x {
+                Some((x, y))
+            } else {
+                None
+            }
+        },
+        None => None,
+    };
+
+    struct NamedTuple {
+        pub x: u8,
+        pub y: (i32, u32),
+    }
+
+    match Some(NamedTuple {
+        // Not linted for now could be
+        x: 17,
+        y: (18, 19),
+    }) {
+        Some(NamedTuple { x, y }) => {
+            if y.1 != x as u32 {
+                Some(NamedTuple { x, y })
+            } else {
+                None
+            }
         },
         None => None,
     };

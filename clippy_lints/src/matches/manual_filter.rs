@@ -110,10 +110,14 @@ fn handle_if_or_else_expr<'tcx>(
 
 // given the closure: `|<pattern>| <expr>`
 // returns `|&<pattern>| <expr>`
-fn insert_ampersand(body_str: String) -> String {
-    let mut with_ampersand = body_str.clone();
-    with_ampersand.insert(1, '&');
-    with_ampersand
+fn add_ampersand_if_copy(body_str: String, has_copy_trait: bool) -> String {
+    if has_copy_trait {
+        let mut with_ampersand = body_str.clone();
+        with_ampersand.insert(1, '&');
+        with_ampersand
+    } else {
+        body_str
+    }
 }
 
 pub(super) fn check_match<'tcx>(
@@ -163,30 +167,26 @@ fn check<'tcx>(
         else_pat,
         else_body,
         get_cond_expr,
-    ){
-
-    span_lint_and_sugg(
-        cx,
-        MANUAL_FILTER,
-        expr.span,
-        "manual implementation of `Option::filter`",
-        "try this",
-        if sugg_info.needs_brackets {
-            format!(
-                "{{ {}{}.filter({}) }}",
-                sugg_info.scrutinee_str,
-                sugg_info.as_ref_str,
-                insert_ampersand(sugg_info.body_str)
-            )
-        } else {
-            format!(
-                "{}{}.filter({})",
-                sugg_info.scrutinee_str,
-                sugg_info.as_ref_str,
-                insert_ampersand(sugg_info.body_str)
-            )
-        },
-        sugg_info.app,
-    );
-}
+    ) {
+        let body_str = add_ampersand_if_copy(sugg_info.body_str, sugg_info.scrutinee_impl_copy);
+        span_lint_and_sugg(
+            cx,
+            MANUAL_FILTER,
+            expr.span,
+            "manual implementation of `Option::filter`",
+            "try this",
+            if sugg_info.needs_brackets {
+                format!(
+                    "{{ {}{}.filter({}) }}",
+                    sugg_info.scrutinee_str, sugg_info.as_ref_str, body_str
+                )
+            } else {
+                format!(
+                    "{}{}.filter({})",
+                    sugg_info.scrutinee_str, sugg_info.as_ref_str, body_str
+                )
+            },
+            sugg_info.app,
+        );
+    }
 }

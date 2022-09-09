@@ -2,7 +2,9 @@ use super::MANUAL_MAP;
 use crate::{map_unit_fn::OPTION_MAP_UNIT_FN, matches::MATCH_AS_REF};
 use clippy_utils::diagnostics::span_lint_and_sugg;
 use clippy_utils::source::{snippet_with_applicability, snippet_with_context};
-use clippy_utils::ty::{is_type_diagnostic_item, peel_mid_ty_refs_is_mutable, type_is_unsafe_function};
+use clippy_utils::ty::{
+    implements_trait, is_type_diagnostic_item, peel_mid_ty_refs_is_mutable, type_is_unsafe_function,
+};
 use clippy_utils::{
     can_move_expr_to_closure, is_else_clause, is_lang_ctor, is_lint_allowed, path_to_local_id, peel_blocks,
     peel_hir_expr_refs, peel_hir_expr_while, sugg::Sugg, CaptureKind,
@@ -62,26 +64,26 @@ fn check<'tcx>(
         else_body,
         get_some_expr,
     ) {
-    span_lint_and_sugg(
-        cx,
-        MANUAL_MAP,
-        expr.span,
-        "manual implementation of `Option::map`",
-        "try this",
-        if sugg_info.needs_brackets {
-            format!(
-                "{{ {}{}.map({}) }}",
-                sugg_info.scrutinee_str, sugg_info.as_ref_str, sugg_info.body_str
-            )
-        } else {
-            format!(
-                "{}{}.map({})",
-                sugg_info.scrutinee_str, sugg_info.as_ref_str, sugg_info.body_str
-            )
-        },
-        sugg_info.app,
-    );
-}
+        span_lint_and_sugg(
+            cx,
+            MANUAL_MAP,
+            expr.span,
+            "manual implementation of `Option::map`",
+            "try this",
+            if sugg_info.needs_brackets {
+                format!(
+                    "{{ {}{}.map({}) }}",
+                    sugg_info.scrutinee_str, sugg_info.as_ref_str, sugg_info.body_str
+                )
+            } else {
+                format!(
+                    "{}{}.map({})",
+                    sugg_info.scrutinee_str, sugg_info.as_ref_str, sugg_info.body_str
+                )
+            },
+            sugg_info.app,
+        );
+    }
 }
 
 #[expect(clippy::too_many_lines)]
@@ -94,7 +96,8 @@ pub(super) fn check_with<'tcx, F>(
     else_pat: Option<&'tcx Pat<'_>>,
     else_body: &'tcx Expr<'_>,
     get_some_expr_fn: F,
-) -> Option<SuggInfo<'tcx>> where
+) -> Option<SuggInfo<'tcx>>
+where
     F: Fn(&LateContext<'tcx>, &'tcx Pat<'_>, &'tcx Expr<'_>, SyntaxContext) -> Option<SomeExpr<'tcx>>,
 {
     let (scrutinee_ty, ty_ref_count, ty_mutability) =
@@ -127,7 +130,7 @@ pub(super) fn check_with<'tcx, F>(
 
     // Top level or patterns aren't allowed in closures.
     if matches!(some_pat.kind, PatKind::Or(_)) {
-        return None
+        return None;
     }
 
     let some_expr = match get_some_expr_fn(cx, some_pat, some_expr, expr_ctxt) {
@@ -193,8 +196,6 @@ pub(super) fn check_with<'tcx, F>(
         scrutinee_str.into()
     };
 
-    // let closure_expr_snip = snippet_with_context(cx, some_expr.expr.span, expr_ctxt, "..", &mut
-    // app).0;
     let closure_expr_snip = some_expr.to_snippet_with_context(cx, expr_ctxt, &mut app);
     let body_str = if let PatKind::Binding(annotation, id, some_binding, None) = some_pat.kind {
         if_chain! {
@@ -235,11 +236,19 @@ pub(super) fn check_with<'tcx, F>(
         }
     } else {
         // Refutable bindings and mixed reference annotations can't be handled by `map`.
-        return None
+        return None;
     };
+
+    // relies on the fact that Option<T>: Copy where T: copy
+    let scrutinee_impl_copy = cx
+        .tcx
+        .lang_items()
+        .copy_trait()
+        .map_or(false, |id| implements_trait(cx, scrutinee_ty, id, &[]));
 
     Some(SuggInfo {
         needs_brackets: else_pat.is_none() && is_else_clause(cx.tcx, expr),
+        scrutinee_impl_copy,
         scrutinee_str,
         as_ref_str,
         body_str,
@@ -249,6 +258,7 @@ pub(super) fn check_with<'tcx, F>(
 
 pub struct SuggInfo<'a> {
     pub needs_brackets: bool,
+    pub scrutinee_impl_copy: bool,
     pub scrutinee_str: String,
     pub as_ref_str: &'a str,
     pub body_str: String,

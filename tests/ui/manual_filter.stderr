@@ -1,5 +1,5 @@
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:5:5
+  --> $DIR/manual_filter.rs:7:5
    |
 LL | /     match Some(0) {
 LL | |         None => None,
@@ -13,7 +13,7 @@ LL | |     };
    = note: `-D clippy::manual-filter` implied by `-D warnings`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:16:5
+  --> $DIR/manual_filter.rs:18:5
    |
 LL | /     match Some(1) {
 LL | |         Some(x) => {
@@ -25,7 +25,7 @@ LL | |     };
    | |_____^ help: try this: `Some(1).filter(|&x| x <= 0)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:27:5
+  --> $DIR/manual_filter.rs:29:5
    |
 LL | /     match Some(2) {
 LL | |         Some(x) => {
@@ -37,7 +37,7 @@ LL | |     };
    | |_____^ help: try this: `Some(2).filter(|&x| x <= 0)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:38:5
+  --> $DIR/manual_filter.rs:40:5
    |
 LL | /     match Some(3) {
 LL | |         Some(x) => {
@@ -49,7 +49,7 @@ LL | |     };
    | |_____^ help: try this: `Some(3).filter(|&x| x > 0)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:50:5
+  --> $DIR/manual_filter.rs:52:5
    |
 LL | /     match y {
 LL | |         // Some(4)
@@ -61,7 +61,7 @@ LL | |     };
    | |_____^ help: try this: `y.filter(|&x| x <= 0)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:62:5
+  --> $DIR/manual_filter.rs:64:5
    |
 LL | /     match Some(5) {
 LL | |         Some(x) => {
@@ -73,12 +73,12 @@ LL | |     };
    | |_____^ help: try this: `Some(5).filter(|&x| x > 0)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:73:5
+  --> $DIR/manual_filter.rs:75:5
    |
 LL | /     match Some(6) {
-LL | |         // Not supported for now, but it could lint and remove `ref`, because this pattern only work if `x` implements
-LL | |         // the `Copy` trait.
 LL | |         Some(ref x) => {
+LL | |             if x > &0 {
+LL | |                 Some(x)
 ...  |
 LL | |         _ => None,
 LL | |     };
@@ -94,7 +94,7 @@ LL | |                 Some(x)
 ...  |
 LL | |         _ => None,
 LL | |     };
-   | |_____^ help: try this: `Some(String::new()).filter(|&x| external_cond)`
+   | |_____^ help: try this: `Some(String::new()).filter(|x| external_cond)`
 
 error: manual implementation of `Option::filter`
   --> $DIR/manual_filter.rs:98:5
@@ -131,18 +131,6 @@ LL | |     };
    | |_____^ help: try this: `Some(9).filter(|&x| x > 10 && x < 100)`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:128:9
-   |
-LL | /         match Some(10) {
-LL | |             Some(x) => {
-LL | |                 if x > 10 && x < 100 {
-LL | |                     Some(x)
-...  |
-LL | |             None => None,
-LL | |         };
-   | |_________^ help: try this: `Some(10).filter(|&x| x > 10 && x < 100)`
-
-error: manual implementation of `Option::filter`
   --> $DIR/manual_filter.rs:141:5
    |
 LL | /     match Some(11) {
@@ -162,26 +150,8 @@ LL +                 x > 10 && x < 100
 LL ~             });
    |
 
-error: in an `if` condition, avoid complex blocks or closures with blocks; instead, move the block or closure higher and bind it with a `let`
-  --> $DIR/manual_filter.rs:144:13
-   |
-LL | /             if {
-LL | |                 println!("foo");
-LL | |                 x > 10 && x < 100
-LL | |             } {
-   | |_____________^
-   |
-   = note: `-D clippy::blocks-in-if-conditions` implied by `-D warnings`
-help: try
-   |
-LL ~             let res = {
-LL +                 println!("foo");
-LL +                 x > 10 && x < 100
-LL ~             }; if res {
-   |
-
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:186:13
+  --> $DIR/manual_filter.rs:185:13
    |
 LL |       let _ = match Some(14) {
    |  _____________^
@@ -194,7 +164,7 @@ LL | |     };
    | |_____^ help: try this: `Some(14).filter(|&x| unsafe { f(x) })`
 
 error: manual implementation of `Option::filter`
-  --> $DIR/manual_filter.rs:196:13
+  --> $DIR/manual_filter.rs:195:13
    |
 LL |       let _ = match Some(15) {
    |  _____________^
@@ -205,5 +175,16 @@ LL | |         None => None,
 LL | |     };
    | |_____^ help: try this: `Some(15).filter(|&x| unsafe { f(x) })`
 
-error: aborting due to 16 previous errors
+error: manual implementation of `Option::filter`
+  --> $DIR/manual_filter.rs:205:12
+   |
+LL |       } else if let Some(x) = Some(16) { // Lint starting from here
+   |  ____________^
+LL | |         if x % 2 == 0 {Some(x)} else {None}
+LL | |     } else {
+LL | |         None
+LL | |     };
+   | |_____^ help: try this: `{ Some(16).filter(|&x| x % 2 == 0) }`
+
+error: aborting due to 15 previous errors
 

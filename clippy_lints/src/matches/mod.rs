@@ -1000,7 +1000,6 @@ impl<'tcx> LateLintPass<'tcx> for Matches {
                     single_match::check(cx, ex, arms, expr);
                     match_bool::check(cx, ex, arms, expr);
                     overlapping_arms::check(cx, ex, arms);
-                    manual_filter::check_match(cx, ex, arms, expr);
                     match_wild_enum::check(cx, ex, arms);
                     match_as_ref::check(cx, ex, arms, expr);
                     needless_match::check_match(cx, ex, arms, expr);
@@ -1010,6 +1009,7 @@ impl<'tcx> LateLintPass<'tcx> for Matches {
                     if !in_constant(cx, expr.hir_id) {
                         manual_unwrap_or::check(cx, expr, ex, arms);
                         manual_map::check_match(cx, expr, ex, arms);
+                        manual_filter::check_match(cx, ex, arms, expr);
                     }
 
                     if self.infallible_destructuring_match_linted {
