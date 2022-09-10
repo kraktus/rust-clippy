@@ -28,6 +28,7 @@ use std::time::Duration;
 
 use cargo_metadata::diagnostic::{Diagnostic, DiagnosticLevel};
 use cargo_metadata::Message;
+use log::{debug, error, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::{DirEntry, WalkDir};
@@ -163,7 +164,7 @@ fn get(path: &str) -> Result<ureq::Response, ureq::Error> {
         match ureq::get(path).call() {
             Ok(res) => return Ok(res),
             Err(e) if retries >= MAX_RETRIES => return Err(e),
-            Err(ureq::Error::Transport(e)) => eprintln!("Error: {e}"),
+            Err(ureq::Error::Transport(e)) => error!("{}", e),
             Err(e) => return Err(e),
         }
         eprintln!("retrying in {retries} seconds...");
@@ -409,21 +410,21 @@ impl Crate {
         let status = &all_output.status;
 
         if !status.success() {
-            eprintln!(
-                "\nWARNING: bad exit status after checking {} {} \n",
+            warn!("bad exit status after checking {} {} \n",
                 self.name, self.version
             );
         }
 
         if config.fix {
+            debug!("{}", stderr);
             if let Some(stderr) = stderr
                 .lines()
                 .find(|line| line.contains("failed to automatically apply fixes suggested by rustc to crate"))
             {
                 let subcrate = &stderr[63..];
-                println!(
-                    "ERROR: failed to apply some suggetion to {} / to (sub)crate {subcrate}",
-                    self.name
+                error!(
+                    "failed to apply some suggetion to {} / to (sub)crate {}",
+                    self.name, subcrate
                 );
             }
             // fast path, we don't need the warnings anyway
@@ -449,7 +450,7 @@ fn build_clippy() {
         .status()
         .expect("Failed to build clippy!");
     if !status.success() {
-        eprintln!("Error: Failed to compile Clippy!");
+        error!("Failed to compile Clippy!");
         std::process::exit(1);
     }
 }
@@ -615,8 +616,8 @@ fn main() {
         .collect();
 
     if crates.is_empty() {
-        eprintln!(
-            "ERROR: could not find crate '{}' in lintcheck/lintcheck_crates.toml",
+        error!(
+            "could not find crate '{}' in lintcheck/lintcheck_crates.toml",
             config.only.unwrap(),
         );
         std::process::exit(1);

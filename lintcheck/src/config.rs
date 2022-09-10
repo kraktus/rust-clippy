@@ -1,4 +1,6 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use env_logger::Builder;
+use log::LevelFilter;
 use std::env;
 use std::path::PathBuf;
 
@@ -39,6 +41,10 @@ fn get_clap_config() -> ArgMatches {
                 .help("Run clippy on the dependencies of crates specified in crates-toml")
                 .conflicts_with("threads")
                 .conflicts_with("fix"),
+            Arg::new("verbose")
+                .short('v')
+                .action(ArgAction::Count)
+                .help("Verbosity to use, default to WARN")
         ])
         .get_matches()
 }
@@ -66,6 +72,19 @@ pub(crate) struct LintcheckConfig {
 impl LintcheckConfig {
     pub fn new() -> Self {
         let clap_config = get_clap_config();
+        let mut builder = Builder::new();
+        builder
+        .filter(
+            None,
+            match clap_config.get_count("verbose") {
+                0 => LevelFilter::Warn,
+                1 => LevelFilter::Info,
+                2 => LevelFilter::Debug,
+                _ => LevelFilter::Trace,
+            },
+        )
+        .default_format()
+        .init();
 
         // first, check if we got anything passed via the LINTCHECK_TOML env var,
         // if not, ask clap if we got any value for --crates-toml  <foo>
