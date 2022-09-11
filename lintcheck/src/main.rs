@@ -337,9 +337,9 @@ impl Crate {
         let shared_target_dir = clippy_project_root().join("target/lintcheck/shared_target_dir");
 
         let mut args = if config.fix {
-            vec!["--fix", "--"]
+            vec!["--fix", "--allow-no-vcs", "--"]
         } else {
-            vec!["--", "--message-format=json", "--"]
+            vec!["--message-format=json", "--"]
         };
 
         if let Some(options) = &self.options {
