@@ -65,4 +65,14 @@ fn main() {
     if a.is_empty() {
         panic!("with expansion {}", one!())
     }
+
+    // Suggestion should preserve comment
+    if a.is_empty() { // comment
+        /* this is a 
+        multiline 
+        comment */
+        /// Doc comment
+        panic!("panic with comment") // comment after `panic!`
+    }
+
 }

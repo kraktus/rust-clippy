@@ -1,9 +1,10 @@
 use clippy_utils::diagnostics::span_lint_and_sugg;
 use clippy_utils::macros::{root_macro_call, FormatArgsExpn};
 use clippy_utils::source::snippet_with_applicability;
-use clippy_utils::{peel_blocks_with_stmt, sugg};
+use clippy_utils::{peel_blocks_with_stmt, sugg, span_extract_comment};
 use rustc_errors::Applicability;
 use rustc_hir::{Expr, ExprKind, UnOp};
+use crate::rustc_lint::LintContext;
 use rustc_lint::{LateContext, LateLintPass};
 use rustc_session::{declare_lint_pass, declare_tool_lint};
 use rustc_span::sym;
@@ -54,6 +55,8 @@ impl<'tcx> LateLintPass<'tcx> for ManualAssert {
                     ExprKind::Unary(UnOp::Not, e) => (e, ""),
                     _ => (cond, "!"),
                 };
+                let comments = span_extract_comment(cx.sess().source_map(), expr.span);
+                dbg!(comments);
                 let cond_sugg = sugg::Sugg::hir_with_applicability(cx, cond, "..", &mut applicability).maybe_par();
                 let sugg = format!("assert!({not}{cond_sugg}, {format_args_snip});");
                 span_lint_and_sugg(
