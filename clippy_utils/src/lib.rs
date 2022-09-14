@@ -88,7 +88,7 @@ use rustc_hir::{
     Mutability, Node, Param, Pat, PatKind, Path, PathSegment, PrimTy, QPath, Stmt, StmtKind, TraitItem, TraitItemKind,
     TraitRef, TyKind, UnOp,
 };
-use rustc_lexer::{tokenize, TokenKind, DocStyle};
+use rustc_lexer::{tokenize, TokenKind};
 use rustc_lint::{LateContext, Level, Lint, LintContext};
 use rustc_middle::hir::place::PlaceBase;
 use rustc_middle::ty as rustc_ty;
@@ -2299,34 +2299,21 @@ pub fn span_contains_comment(sm: &SourceMap, span: Span) -> bool {
 /// Comments are returned wrapped with their relevant
 pub fn span_extract_comment(sm: &SourceMap, span: Span) -> String {
     let snippet = sm.span_to_snippet(span).unwrap_or(String::new());
-    let mut comments_buf = String::new();
+    let mut comments_buf: Vec<String> = Vec::new();
     let mut index: usize = 0;
 
     for token in tokenize(&snippet) {
         let token_range = index..(index + token.len as usize);
         index += token.len as usize;
         match token.kind {
-            TokenKind::BlockComment { doc_style, .. } => {
-                let style = match doc_style {
-                Some(DocStyle::Outer) => "/**",
-                Some(DocStyle::Inner) => "/*!",
-                None => "/*"
-                };
-                snippet.get(token_range).map(|c| comments_buf += &format!("{style}{c}*/"));
-            },
-            TokenKind::LineComment { doc_style } => {
-                let style = match doc_style {
-                Some(DocStyle::Outer) => "///",
-                Some(DocStyle::Inner) => "//!",
-                None => "//"
-            };
-            snippet.get(token_range).map(|c| comments_buf += &format!("{style}{c}\n"));
+            TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
+                snippet.get(token_range).map(|c| comments_buf.push(c.to_string()));
             },
             _ => (),
         }
     }
 
-    comments_buf
+    comments_buf.join("\n")
 }
 
 macro_rules! op_utils {

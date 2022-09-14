@@ -1,4 +1,4 @@
-use clippy_utils::diagnostics::span_lint_and_sugg;
+use clippy_utils::diagnostics::span_lint_and_then;
 use clippy_utils::macros::{root_macro_call, FormatArgsExpn};
 use clippy_utils::source::snippet_with_applicability;
 use clippy_utils::{peel_blocks_with_stmt, sugg, span_extract_comment};
@@ -51,22 +51,38 @@ impl<'tcx> LateLintPass<'tcx> for ManualAssert {
                 let mut applicability = Applicability::MachineApplicable;
                 let format_args_snip = snippet_with_applicability(cx, format_args.inputs_span(), "..", &mut applicability);
                 let cond = cond.peel_drop_temps();
+
                 let (cond, not) = match cond.kind {
                     ExprKind::Unary(UnOp::Not, e) => (e, ""),
                     _ => (cond, "!"),
                 };
-                let comments = span_extract_comment(cx.sess().source_map(), expr.span);
-                dbg!(comments);
+                let mut comments = span_extract_comment(cx.sess().source_map(), expr.span);
+                if !comments.is_empty() {
+                    comments += "\n"
+                }
+                dbg!(&comments);
                 let cond_sugg = sugg::Sugg::hir_with_applicability(cx, cond, "..", &mut applicability).maybe_par();
                 let sugg = format!("assert!({not}{cond_sugg}, {format_args_snip});");
-                span_lint_and_sugg(
+                // we show to the user the suggestion without the comments, but when applicating the fix, include the comments in the block
+                span_lint_and_then(
                     cx,
                     MANUAL_ASSERT,
                     expr.span,
                     "only a `panic!` in `if`-then statement",
-                    "try",
-                    sugg,
-                    Applicability::MachineApplicable,
+                    |diag| {
+                        diag.span_suggestion(  
+                                    expr.span,
+                                    "try",
+                                    &sugg,
+                                    Applicability::MachineApplicable); // comments are noisy, do not show them
+
+                        // diag.tool_only_span_suggestion(  
+                        //             expr.span,
+                        //             "try",
+                        //             format!("{comments}{sugg}"),
+                        //             Applicability::MachineApplicable);
+                    }
+                                
                 );
             }
         }
