@@ -1,11 +1,10 @@
-use clippy_utils::diagnostics::{span_lint_hir_and_then, span_lint_and_then};
+use clippy_utils::diagnostics::span_lint_hir_and_then;
 use clippy_utils::source::{snippet_opt, snippet_with_context};
-use clippy_utils::{fn_def_id, path_to_local_id, get_enclosing_block};
+use clippy_utils::{fn_def_id, path_to_local_id};
 use if_chain::if_chain;
-use rustc_middle::ty::TyCtxt;
-use rustc_errors::{Applicability, Diagnostic};
+use rustc_errors::Applicability;
 use rustc_hir::intravisit::{walk_expr, FnKind, Visitor};
-use rustc_hir::{Block, Body, Expr, ExprKind, FnDecl, HirId, MatchSource, Node,PatKind, StmtKind};
+use rustc_hir::{Block, Body, Expr, ExprKind, FnDecl, HirId, MatchSource, PatKind, StmtKind};
 use rustc_lint::{LateContext, LateLintPass, LintContext};
 use rustc_middle::lint::in_external_macro;
 use rustc_middle::ty::subst::GenericArgKind;
@@ -71,29 +70,26 @@ enum RetReplacement {
     Empty,
     Block,
     Unit,
-    Span(Span)
 }
 
 impl RetReplacement {
     fn sugg_help(&self) -> &'static str {
         match *self {
-            Self::Empty | Self::Span(_) => "remove `return`",
+            Self::Empty => "remove `return`",
             Self::Block => "replace `return` with an empty block",
             Self::Unit => "replace `return` with a unit value",
         }
     }
+}
 
-    fn return_replacement<'tcx>(&self, cx: &LateContext<'tcx>, ctxt: SyntaxContext, app: &mut Applicability) -> String {
+impl ToString for RetReplacement {
+    fn to_string(&self) -> String {
         match *self {
-            Self::Empty => "".to_string(),
-            Self::Block => "{}".to_string(),
-            Self::Unit => "()".to_string(),
-            Self::Span(inner_span) => {
-                let (snippet, _) = snippet_with_context(cx, inner_span, ctxt, "..", app);
-                snippet.to_string()
-            }
+            Self::Empty => "",
+            Self::Block => "{}",
+            Self::Unit => "()",
         }
-        
+        .to_string()
     }
 }
 
@@ -162,9 +158,9 @@ impl<'tcx> LateLintPass<'tcx> for Return {
                 let replacement = if let ExprKind::Ret(None) = &body.value.kind {
                     RetReplacement::Block
                 } else {
-                    RetReplacement::Span(body.value.span)
+                    RetReplacement::Empty
                 };
-                check_final_expr(cx, body.value, replacement);
+                check_final_expr(cx, body.value, body.value.span, replacement);
             },
             FnKind::ItemFn(..) | FnKind::Method(..) => {
                 check_block_return(cx, &body.value.kind);
@@ -177,11 +173,11 @@ impl<'tcx> LateLintPass<'tcx> for Return {
 fn check_block_return<'tcx>(cx: &LateContext<'tcx>, expr_kind: &ExprKind<'tcx>) {
     if let ExprKind::Block(block, _) = expr_kind {
         if let Some(block_expr) = block.expr {
-            check_final_expr(cx, block_expr, RetReplacement::Span(block_expr.span));
+            check_final_expr(cx, block_expr, block_expr.span, RetReplacement::Empty);
         } else if let Some(stmt) = block.stmts.iter().last() {
             match stmt.kind {
                 StmtKind::Expr(expr) | StmtKind::Semi(expr) => {
-                    check_final_expr(cx, expr, stmt.span, RetReplacement::Span(expr.span));
+                    check_final_expr(cx, expr, stmt.span, RetReplacement::Empty);
                 },
                 _ => (),
             }
@@ -190,8 +186,7 @@ fn check_block_return<'tcx>(cx: &LateContext<'tcx>, expr_kind: &ExprKind<'tcx>) 
 }
 
 fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: Span, replacement: RetReplacement) {
-    let peeled_expr =expr.peel_drop_temps();
-    match &peeled_expr.kind {
+    match &expr.peel_drop_temps().kind {
         // simple return is always "bad"
         ExprKind::Ret(ref inner) => {
             if cx.tcx.hir().attrs(expr.hir_id).is_empty() {
@@ -199,7 +194,7 @@ fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: 
                 if !borrows {
                     emit_return_lint(
                         cx,
-                        peeled_expr,
+                        inner.map_or(expr.hir_id, |inner| inner.hir_id),
                         span,
                         inner.as_ref().map(|i| i.span),
                         replacement,
@@ -219,7 +214,7 @@ fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: 
         // (except for unit type functions) so we don't match it
         ExprKind::Match(_, arms, MatchSource::Normal) => {
             for arm in arms.iter() {
-                check_final_expr(cx, arm.body, RetReplacement::Span(arm.body.span));
+                check_final_expr(cx, arm.body, arm.body.span, RetReplacement::Unit);
             }
         },
         // if it's a whole block, check it
@@ -229,46 +224,38 @@ fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: 
 
 fn emit_return_lint(
     cx: &LateContext<'_>,
-    ret_expr: &Expr<'_>,
+    emission_place: HirId,
     ret_span: Span,
+    inner_span: Option<Span>,
     replacement: RetReplacement,
 ) {
     if ret_span.from_expansion() {
         return;
     }
     let mut applicability = Applicability::MachineApplicable;
-    let return_replacement = replacement.return_replacement(cx, ret_span.ctxt(), &mut app);
-    let sugg_help = replacement.sugg_help();
-    span_lint_and_then(
+    let return_replacement = inner_span.map_or_else(
+        || replacement.to_string(),
+        |inner_span| {
+            let (snippet, _) = snippet_with_context(cx, inner_span, ret_span.ctxt(), "..", &mut applicability);
+            snippet.to_string()
+        },
+    );
+    let sugg_help = if inner_span.is_some() {
+        "remove `return`"
+    } else {
+        replacement.sugg_help()
+    };
+    span_lint_hir_and_then(
         cx,
         NEEDLESS_RETURN,
+        emission_place,
         ret_span,
         "unneeded `return` statement",
         |diag| {
             diag.span_suggestion(ret_span, sugg_help, return_replacement, applicability);
-            //remove_semi(cx, diag, ret_expr, applicability);
         },
     );
 }
-
-
-// if the return is in a statement block which ends with a semicolon remove it. Example:
-//
-// {
-//    return 0;
-// };
-// TODO make it recursive
-fn remove_semi(cx: &LateContext<'_>, diag: &mut Diagnostic, ret_expr: &Expr<'_>, app: Applicability) {
-    if let Some(block) = get_enclosing_block(cx, ret_expr.hir_id)
-    && let Some(outer_block) = get_enclosing_block(cx, block.hir_id)
-    {//&& let StmtKind::Semi(semi_expr) = stmt.kind {
-        dbg!(&outer_block);
-        //let semicolon_span = stmt.span.with_lo(stmt.span.hi() - rustc_span::BytePos(1));
-        //diag.span_suggestion(semicolon_span, "remove this semicolon", "", app);
-        //remove_semi(tcx, diag, semi_expr, app) // should hang
-    }
-}
-
 
 fn last_statement_borrows<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>) -> bool {
     let mut visitor = BorrowVisitor { cx, borrows: false };
