@@ -11,7 +11,6 @@ use rustc_middle::lint::in_external_macro;
 use rustc_middle::ty::subst::GenericArgKind;
 use rustc_session::{declare_lint_pass, declare_tool_lint};
 use rustc_span::source_map::Span;
-use rustc_span::SyntaxContext;
 
 declare_clippy_lint! {
     /// ### What it does
@@ -163,9 +162,9 @@ impl<'tcx> LateLintPass<'tcx> for Return {
                 let replacement = if let ExprKind::Ret(None) = &body.value.kind {
                     RetReplacement::Block
                 } else {
-                    RetReplacement::Empty
+                    RetReplacement::Span(body.value.span)
                 };
-                check_final_expr(cx, body.value, body.value.span, replacement);
+                check_final_expr(cx, body.value, replacement);
             },
             FnKind::ItemFn(..) | FnKind::Method(..) => {
                 check_block_return(cx, &body.value.kind);
@@ -178,7 +177,7 @@ impl<'tcx> LateLintPass<'tcx> for Return {
 fn check_block_return<'tcx>(cx: &LateContext<'tcx>, expr_kind: &ExprKind<'tcx>) {
     if let ExprKind::Block(block, _) = expr_kind {
         if let Some(block_expr) = block.expr {
-            check_final_expr(cx, block_expr, block_expr.span, RetReplacement::Span(block_expr.span));
+            check_final_expr(cx, block_expr, RetReplacement::Span(block_expr.span));
         } else if let Some(stmt) = block.stmts.iter().last() {
             match stmt.kind {
                 StmtKind::Expr(expr) | StmtKind::Semi(expr) => {
@@ -202,7 +201,8 @@ fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: 
                         cx,
                         peeled_expr,
                         span,
-                        inner.as_ref().map(|i| i.span).map_or(replacement, |span| RetReplacement::Span(span)),
+                        inner.as_ref().map(|i| i.span),
+                        replacement,
                     );
                 }
             }
@@ -219,7 +219,7 @@ fn check_final_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, span: 
         // (except for unit type functions) so we don't match it
         ExprKind::Match(_, arms, MatchSource::Normal) => {
             for arm in arms.iter() {
-                check_final_expr(cx, arm.body, arm.body.span, RetReplacement::Unit);
+                check_final_expr(cx, arm.body, RetReplacement::Span(arm.body.span));
             }
         },
         // if it's a whole block, check it
@@ -237,7 +237,7 @@ fn emit_return_lint(
         return;
     }
     let mut applicability = Applicability::MachineApplicable;
-    let return_replacement = replacement.return_replacement(cx, ret_span.ctxt(), &mut applicability);
+    let return_replacement = replacement.return_replacement(cx, ret_span.ctxt(), &mut app);
     let sugg_help = replacement.sugg_help();
     span_lint_and_then(
         cx,
@@ -258,16 +258,16 @@ fn emit_return_lint(
 //    return 0;
 // };
 // TODO make it recursive
-// fn remove_semi(cx: &LateContext<'_>, diag: &mut Diagnostic, ret_expr: &Expr<'_>, app: Applicability) {
-//     if let Some(block) = get_enclosing_block(cx, ret_expr.hir_id)
-//     && let Some(outer_block) = get_enclosing_block(cx, block.hir_id)
-//     {//&& let StmtKind::Semi(semi_expr) = stmt.kind {
-//         dbg!(&outer_block);
-//         //let semicolon_span = stmt.span.with_lo(stmt.span.hi() - rustc_span::BytePos(1));
-//         //diag.span_suggestion(semicolon_span, "remove this semicolon", "", app);
-//         //remove_semi(tcx, diag, semi_expr, app) // should hang
-//     }
-// }
+fn remove_semi(cx: &LateContext<'_>, diag: &mut Diagnostic, ret_expr: &Expr<'_>, app: Applicability) {
+    if let Some(block) = get_enclosing_block(cx, ret_expr.hir_id)
+    && let Some(outer_block) = get_enclosing_block(cx, block.hir_id)
+    {//&& let StmtKind::Semi(semi_expr) = stmt.kind {
+        dbg!(&outer_block);
+        //let semicolon_span = stmt.span.with_lo(stmt.span.hi() - rustc_span::BytePos(1));
+        //diag.span_suggestion(semicolon_span, "remove this semicolon", "", app);
+        //remove_semi(tcx, diag, semi_expr, app) // should hang
+    }
+}
 
 
 fn last_statement_borrows<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>) -> bool {
