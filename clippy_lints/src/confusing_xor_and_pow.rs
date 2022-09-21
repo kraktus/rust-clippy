@@ -22,7 +22,7 @@ declare_clippy_lint! {
     #[clippy::version = "1.65.0"]
     pub CONFUSING_XOR_AND_POW,
     pedantic,
-    "default lint description"
+    "the `^` operator is being used as exponentiation"
 }
 declare_lint_pass!(ConfusingXorAndPow => [CONFUSING_XOR_AND_POW]);
 
