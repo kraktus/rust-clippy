@@ -13,6 +13,7 @@ store.register_group(true, "clippy::pedantic", Some("clippy_pedantic"), vec![
     LintId::of(casts::CAST_SIGN_LOSS),
     LintId::of(casts::PTR_AS_PTR),
     LintId::of(checked_conversions::CHECKED_CONVERSIONS),
+    LintId::of(confusing_xor_and_pow::CONFUSING_XOR_AND_POW),
     LintId::of(copies::SAME_FUNCTIONS_IN_IF_CONDITION),
     LintId::of(copy_iterator::COPY_ITERATOR),
     LintId::of(default::DEFAULT_TRAIT_ACCESS),

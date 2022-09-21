@@ -187,6 +187,7 @@ mod checked_conversions;
 mod cognitive_complexity;
 mod collapsible_if;
 mod comparison_chain;
+mod confusing_xor_and_pow;
 mod copies;
 mod copy_iterator;
 mod crate_in_macro_def;
@@ -906,6 +907,7 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
     store.register_late_pass(|| Box::new(unused_peekable::UnusedPeekable));
     store.register_early_pass(|| Box::new(multi_assignments::MultiAssignments));
     store.register_late_pass(|| Box::new(bool_to_int_with_if::BoolToIntWithIf));
+    store.register_late_pass(|| Box::new(confusing_xor_and_pow::ConfusingXorAndPow));
     // add lints here, do not remove this comment, it's used in `new_lint`
 }
 
