@@ -88,6 +88,7 @@ docs! {
     "collapsible_str_replace",
     "comparison_chain",
     "comparison_to_empty",
+    "confusing_xor_and_pow",
     "copy_iterator",
     "crate_in_macro_def",
     "create_dir",

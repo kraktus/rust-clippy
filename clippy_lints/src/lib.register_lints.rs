@@ -93,6 +93,7 @@ store.register_lints(&[
     collapsible_if::COLLAPSIBLE_ELSE_IF,
     collapsible_if::COLLAPSIBLE_IF,
     comparison_chain::COMPARISON_CHAIN,
+    confusing_xor_and_pow::CONFUSING_XOR_AND_POW,
     copies::BRANCHES_SHARING_CODE,
     copies::IFS_SAME_COND,
     copies::IF_SAME_THEN_ELSE,

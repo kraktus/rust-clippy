@@ -1,0 +1,28 @@
+error: '^' is not the exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:7:13
+   |
+LL |     let _ = 2 ^ 9;
+   |             ^^^^^ help: did you mean to write: `2.pow(9)`
+   |
+   = note: `-D clippy::confusing-xor-and-pow` implied by `-D warnings`
+
+error: '^' is not the exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:8:13
+   |
+LL |     let _ = 50 ^ 3;
+   |             ^^^^^^ help: did you mean to write: `50.pow(3)`
+
+error: '^' is not the exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:9:13
+   |
+LL |     let _ = 5 ^ 8;
+   |             ^^^^^ help: did you mean to write: `5.pow(8)`
+
+error: it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:10:13
+   |
+LL |     let _ = 2 ^ 32;
+   |             ^^^^^^ help: try with: `u32::MAX`
+
+error: aborting due to 4 previous errors
+
