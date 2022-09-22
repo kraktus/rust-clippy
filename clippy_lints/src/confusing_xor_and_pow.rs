@@ -4,7 +4,6 @@ use rustc_errors::Applicability;
 use rustc_hir::{BinOpKind, Expr, ExprKind, Lit};
 use rustc_lint::{LateContext, LateLintPass};
 use rustc_session::{declare_lint_pass, declare_tool_lint};
-use rustc_span::Span;
 
 declare_clippy_lint! {
     /// ### What it does
@@ -33,33 +32,48 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             if op.node == BinOpKind::BitXor;
             if let ExprKind::Lit(litr) = &right.kind;
             if let ExprKind::Lit(litl) = &left.kind;
-            if is_decimal(cx, right.span, litr) && is_decimal(cx, left.span, litl);
-            then {
-                let left_val = unwrap_lit_to_dec(&left.kind).unwrap_or(0);
-                let right_val = unwrap_lit_to_dec(&right.kind).unwrap_or(0);
-                if left_val == 2 && (right_val == 8 || right_val == 16 || right_val == 32 || right_val == 64) {
-                    clippy_utils::diagnostics::span_lint_and_sugg(
-                        cx,
-                        CONFUSING_XOR_AND_POW,
-                        expr.span,
-                        "it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator",
-                        "try with",
-                        format!("u{right_val}::MAX"),
-                        Applicability::MaybeIncorrect,
-                    );
-                } else {
-                    // Even then, warn always.
-                    clippy_utils::diagnostics::span_lint_and_sugg(
-                        cx,
-                        CONFUSING_XOR_AND_POW,
-                        expr.span,
-                        "'^' is not the exponentiation operator",
-                        "did you mean to write",
-                        format!("{left_val}.pow({right_val})"),
-                        Applicability::MaybeIncorrect,
-                    );
-                }
-            }
+            if let snip_left = snippet_opt(cx, litl.span).unwrap();
+            if let snip_right = snippet_opt(cx, litr.span).unwrap();
+            if get_numlit(litr, &snip_right)
+                        .unwrap()
+                        .is_decimal();
+            if get_numlit(litl, &snip_left)
+                        .unwrap()
+                        .is_decimal();
+                then {
+
+                            let left_val = unwrap_lit_to_dec(&left.kind).unwrap_or(0);
+                            let right_val = unwrap_lit_to_dec(&right.kind).unwrap_or(0);
+                            let suffix: &str = get_numlit( litr, &snip_right).unwrap().suffix.unwrap_or("");
+                            if left_val == 2 &&
+                             (right_val == 8 ||
+                            right_val == 16 ||
+                            right_val == 32 ||
+                            right_val == 64)
+                            {
+                                clippy_utils::diagnostics::span_lint_and_sugg(
+                                    cx,
+                                    CONFUSING_XOR_AND_POW,
+                                    expr.span,
+                                    "it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator",
+                                    "try with",
+                                    format!("u{right_val}::MAX"),
+                                    Applicability::MaybeIncorrect,
+                                );
+                            } else {
+                                // Even then, warn always.
+                                clippy_utils::diagnostics::span_lint_and_sugg(
+                                    cx,
+                                    CONFUSING_XOR_AND_POW,
+                                    expr.span,
+                                    "'^' is not the exponentiation operator",
+                                    "did you mean to write",
+                                    format!("{left_val}{suffix}.pow({right_val})"),
+                                    Applicability::MaybeIncorrect,
+                                );
+                            }
+
+                    }
         }
     }
 }
@@ -75,11 +89,16 @@ fn unwrap_lit_to_dec(expr: &ExprKind<'_>) -> Option<u128> {
     }
 }
 
-fn is_decimal(cx: &LateContext<'_>, span: Span, lit: &Lit) -> bool {
-    if let Some(snippet) = snippet_opt(cx, span) {
-        if let Some(decoded) = NumericLiteral::from_lit_kind(&snippet, &lit.node) {
-            return decoded.is_decimal();
-        }
-    }
-    false
+fn get_numlit<'a>(lit: &Lit, snip: &'a str) -> Option<NumericLiteral<'a>> {
+    let decoded = match NumericLiteral::from_lit_kind(snip, &lit.node) {
+        Some(numlit) => numlit,
+        None => return None,
+    };
+    Some(decoded)
 }
+
+// fn get_suffix<'a>(cx: &LateContext<'_>, span: Span, lit: &Lit) -> Option<&'a str> {
+//     let snippet = snippet_opt(cx, span);
+//     let decoded = NumericLiteral::from_lit_kind(&snippet.unwrap_or(String::new()),
+// &lit.node).unwrap(); 	decoded.suffix
+// }
