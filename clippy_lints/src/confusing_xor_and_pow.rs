@@ -12,11 +12,11 @@ declare_clippy_lint! {
     ///	It's most probably a typo and may lead to unexpected behaviours.
     /// ### Example
     /// ```rust
-    /// let x = 3 ^ 4;
+    /// let x = 3_i32 ^ 4_i32;
     /// ```
     /// Use instead:
     /// ```rust
-    /// let x = 3.pow(4);
+    /// let x = 3_i32.pow(4);
     /// ```
     #[clippy::version = "1.65.0"]
     pub CONFUSING_XOR_AND_POW,
