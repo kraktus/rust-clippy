@@ -90,11 +90,7 @@ fn unwrap_lit_to_dec(expr: &ExprKind<'_>) -> Option<u128> {
 }
 
 fn get_numlit<'a>(lit: &Lit, snip: &'a str) -> Option<NumericLiteral<'a>> {
-    let decoded = match NumericLiteral::from_lit_kind(snip, &lit.node) {
-        Some(numlit) => numlit,
-        None => return None,
-    };
-    Some(decoded)
+    NumericLiteral::from_lit_kind(snip, &lit.node)
 }
 
 // fn get_suffix<'a>(cx: &LateContext<'_>, span: Span, lit: &Lit) -> Option<&'a str> {
