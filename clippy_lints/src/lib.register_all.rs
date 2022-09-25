@@ -310,6 +310,7 @@ store.register_group(true, "clippy::all", Some("clippy_all"), vec![
     LintId::of(strlen_on_c_strings::STRLEN_ON_C_STRINGS),
     LintId::of(suspicious_trait_impl::SUSPICIOUS_ARITHMETIC_IMPL),
     LintId::of(suspicious_trait_impl::SUSPICIOUS_OP_ASSIGN_IMPL),
+    LintId::of(suspicious_xor::SUSPICIOUS_XOR),
     LintId::of(swap::ALMOST_SWAPPED),
     LintId::of(swap::MANUAL_SWAP),
     LintId::of(swap_ptr_to_ref::SWAP_PTR_TO_REF),

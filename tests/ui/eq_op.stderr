@@ -42,6 +42,14 @@ error: equal expressions as operands to `^`
 LL |         let _ = 1 ^ ((((((1))))));
    |                 ^^^^^^^^^^^^^^^^^
 
+error: '^' is not the exponentiation operator
+  --> $DIR/eq_op.rs:19:17
+   |
+LL |         let _ = 1 ^ ((((((1))))));
+   |                 ^^^^^^^^^^^^^^^^^ help: did you mean to write: `1.pow(1)`
+   |
+   = note: `-D clippy::suspicious-xor` implied by `-D warnings`
+
 error: equal expressions as operands to `<`
   --> $DIR/eq_op.rs:23:13
    |
@@ -168,5 +176,5 @@ error: equal expressions as operands to `==`
 LL |     (n1.inner.0).0 == (n1.inner.0).0 && (n1.inner.1).0 == (n2.inner.1).0 && (n1.inner.2).0 == (n2.inner.2).0
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 28 previous errors
+error: aborting due to 29 previous errors
 
