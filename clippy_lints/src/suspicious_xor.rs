@@ -19,11 +19,11 @@ declare_clippy_lint! {
     /// let x = 3_i32.pow(4);
     /// ```
     #[clippy::version = "1.65.0"]
-    pub CONFUSING_XOR_AND_POW,
-    pedantic,
-    "the `^` operator is being used as exponentiation"
+    pub SUSPICIOUS_XOR,
+    suspicious,
+    "XOR (`^`) operator possibly used as exponentiation operator"
 }
-declare_lint_pass!(ConfusingXorAndPow => [CONFUSING_XOR_AND_POW]);
+declare_lint_pass!(ConfusingXorAndPow => [SUSPICIOUS_XOR]);
 
 impl LateLintPass<'_> for ConfusingXorAndPow {
     fn check_expr(&mut self, cx: &LateContext<'_>, expr: &Expr<'_>) {
@@ -50,7 +50,7 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
                             {
                                 clippy_utils::diagnostics::span_lint_and_sugg(
                                     cx,
-                                    CONFUSING_XOR_AND_POW,
+                                    SUSPICIOUS_XOR,
                                     expr.span,
                                     "it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator",
                                     "try with",
@@ -61,7 +61,7 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
                                 // Even then, warn always.
                                 clippy_utils::diagnostics::span_lint_and_sugg(
                                     cx,
-                                    CONFUSING_XOR_AND_POW,
+                                    SUSPICIOUS_XOR,
                                     expr.span,
                                     "'^' is not the exponentiation operator",
                                     "did you mean to write",

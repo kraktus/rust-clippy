@@ -1,5 +1,5 @@
 #![allow(unused)]
-#![warn(clippy::confusing_xor_and_pow)]
+#![warn(clippy::suspicious_xor)]
 #![allow(clippy::eq_op)]
 
 macro_rules! macro_test {
