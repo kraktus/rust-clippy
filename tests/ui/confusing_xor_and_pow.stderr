@@ -1,5 +1,5 @@
 error: '^' is not the exponentiation operator
-  --> $DIR/confusing_xor_and_pow.rs:7:13
+  --> $DIR/confusing_xor_and_pow.rs:13:13
    |
 LL |     let _ = 2i32 ^ 9i32;
    |             ^^^^^^^^^^^ help: did you mean to write: `2i32.pow(9)`
@@ -7,22 +7,34 @@ LL |     let _ = 2i32 ^ 9i32;
    = note: `-D clippy::confusing-xor-and-pow` implied by `-D warnings`
 
 error: '^' is not the exponentiation operator
-  --> $DIR/confusing_xor_and_pow.rs:8:13
+  --> $DIR/confusing_xor_and_pow.rs:14:13
+   |
+LL |     let _ = 2i32 ^ 2i32;
+   |             ^^^^^^^^^^^ help: did you mean to write: `2i32.pow(2)`
+
+error: '^' is not the exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:15:13
    |
 LL |     let _ = 50i32 ^ 3i32;
    |             ^^^^^^^^^^^^ help: did you mean to write: `50i32.pow(3)`
 
 error: '^' is not the exponentiation operator
-  --> $DIR/confusing_xor_and_pow.rs:9:13
+  --> $DIR/confusing_xor_and_pow.rs:16:13
    |
 LL |     let _ = 5i32 ^ 8i32;
    |             ^^^^^^^^^^^ help: did you mean to write: `5i32.pow(8)`
 
 error: it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator
-  --> $DIR/confusing_xor_and_pow.rs:10:13
+  --> $DIR/confusing_xor_and_pow.rs:17:13
    |
 LL |     let _ = 2i32 ^ 32i32;
    |             ^^^^^^^^^^^^ help: try with: `u32::MAX`
 
-error: aborting due to 4 previous errors
+error: '^' is not the exponentiation operator
+  --> $DIR/confusing_xor_and_pow.rs:18:13
+   |
+LL |     let _ = 2i32 ^ macro_test!();
+   |             ^^^^^^^^^^^^^^^^^^^^ help: did you mean to write: `2.pow(13)`
+
+error: aborting due to 6 previous errors
 

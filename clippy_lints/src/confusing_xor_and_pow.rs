@@ -1,4 +1,4 @@
-use clippy_utils::{numeric_literal::NumericLiteral, source::snippet_opt};
+use clippy_utils::{numeric_literal::NumericLiteral, source::snippet};
 use rustc_ast::LitKind;
 use rustc_errors::Applicability;
 use rustc_hir::{BinOpKind, Expr, ExprKind, Lit};
@@ -32,24 +32,21 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             if op.node == BinOpKind::BitXor;
             if let ExprKind::Lit(litr) = &right.kind;
             if let ExprKind::Lit(litl) = &left.kind;
-            if let snip_left = snippet_opt(cx, litl.span).unwrap();
-            if let snip_right = snippet_opt(cx, litr.span).unwrap();
+            if let snip_left = snippet(cx, litl.span, "..");
+            if let snip_right = snippet(cx, litr.span, "..");
             if get_numlit(litr, &snip_right)
-                        .unwrap()
-                        .is_decimal();
-            if get_numlit(litl, &snip_left)
-                        .unwrap()
-                        .is_decimal();
+            .zip(get_numlit(litl, &snip_left))
+            .map_or(false, |(a,b)| a.is_decimal() && b.is_decimal());
+            if let left_val = unwrap_lit_to_dec(left).unwrap_or(0);
+            if let right_val = unwrap_lit_to_dec(right).unwrap_or(0);
+            if let suffix = get_numlit(litr, &snip_right).unwrap().suffix.unwrap_or("");
                 then {
 
-                            let left_val = unwrap_lit_to_dec(&left.kind).unwrap_or(0);
-                            let right_val = unwrap_lit_to_dec(&right.kind).unwrap_or(0);
-                            let suffix: &str = get_numlit( litr, &snip_right).unwrap().suffix.unwrap_or("");
                             if left_val == 2 &&
                              (right_val == 8 ||
                             right_val == 16 ||
                             right_val == 32 ||
-                            right_val == 64)
+                            right_val == 64 || right_val == 128)
                             {
                                 clippy_utils::diagnostics::span_lint_and_sugg(
                                     cx,
@@ -78,9 +75,8 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
     }
 }
 
-// from ExprKind::Lit.node (Int) to u128
-fn unwrap_lit_to_dec(expr: &ExprKind<'_>) -> Option<u128> {
-    match expr {
+fn unwrap_lit_to_dec(expr: &Expr<'_>) -> Option<u128> {
+    match &expr.kind {
         ExprKind::Lit(lit) => match lit.node {
             LitKind::Int(num, _) => Some(num),
             _ => None,
@@ -92,9 +88,3 @@ fn unwrap_lit_to_dec(expr: &ExprKind<'_>) -> Option<u128> {
 fn get_numlit<'a>(lit: &Lit, snip: &'a str) -> Option<NumericLiteral<'a>> {
     NumericLiteral::from_lit_kind(snip, &lit.node)
 }
-
-// fn get_suffix<'a>(cx: &LateContext<'_>, span: Span, lit: &Lit) -> Option<&'a str> {
-//     let snippet = snippet_opt(cx, span);
-//     let decoded = NumericLiteral::from_lit_kind(&snippet.unwrap_or(String::new()),
-// &lit.node).unwrap(); 	decoded.suffix
-// }
