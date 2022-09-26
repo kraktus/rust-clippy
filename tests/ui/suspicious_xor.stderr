@@ -1,40 +1,46 @@
 error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:13:13
    |
-LL |     let _ = 2i32 ^ 9i32;
-   |             ^^^^^^^^^^^ help: did you mean to write: `2i32.pow(9)`
+LL |     let _ = 2 ^ 5;
+   |             ^^^^^ help: did you mean to write: `2.pow(5)`
    |
    = note: `-D clippy::suspicious-xor` implied by `-D warnings`
 
 error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:14:13
    |
-LL |     let _ = 2i32 ^ 2i32;
-   |             ^^^^^^^^^^^ help: did you mean to write: `2i32.pow(2)`
+LL |     let _ = 2i32 ^ 9i32;
+   |             ^^^^^^^^^^^ help: did you mean to write: `2_i32.pow(9_i32)`
 
 error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:15:13
    |
-LL |     let _ = 50i32 ^ 3i32;
-   |             ^^^^^^^^^^^^ help: did you mean to write: `50i32.pow(3)`
+LL |     let _ = 2i32 ^ 2i32;
+   |             ^^^^^^^^^^^ help: did you mean to write: `2_i32.pow(2_i32)`
 
 error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:16:13
    |
-LL |     let _ = 5i32 ^ 8i32;
-   |             ^^^^^^^^^^^ help: did you mean to write: `5i32.pow(8)`
+LL |     let _ = 50i32 ^ 3i32;
+   |             ^^^^^^^^^^^^ help: did you mean to write: `50_i32.pow(3_i32)`
 
-error: it appears that you are trying to get the maximum value of an integer, but '^' is not exponentiation operator
+error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:17:13
    |
-LL |     let _ = 2i32 ^ 32i32;
-   |             ^^^^^^^^^^^^ help: try with: `u32::MAX`
+LL |     let _ = 5i32 ^ 8i32;
+   |             ^^^^^^^^^^^ help: did you mean to write: `5_i32.pow(8_i32)`
 
 error: '^' is not the exponentiation operator
   --> $DIR/suspicious_xor.rs:18:13
    |
-LL |     let _ = 2i32 ^ macro_test!();
-   |             ^^^^^^^^^^^^^^^^^^^^ help: did you mean to write: `2.pow(13)`
+LL |     let _ = 2i32 ^ 32i32;
+   |             ^^^^^^^^^^^^ help: did you mean to write: `2_i32.pow(32_i32)`
 
-error: aborting due to 6 previous errors
+error: '^' is not the exponentiation operator
+  --> $DIR/suspicious_xor.rs:19:13
+   |
+LL |     let _ = 2i32 ^ macro_test!();
+   |             ^^^^^^^^^^^^^^^^^^^^ help: did you mean to write: `2_i32.pow(13)`
+
+error: aborting due to 7 previous errors
 
