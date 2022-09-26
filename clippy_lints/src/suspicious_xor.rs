@@ -2,7 +2,8 @@ use clippy_utils::{numeric_literal::NumericLiteral, source::snippet};
 use rustc_ast::LitKind;
 use rustc_errors::Applicability;
 use rustc_hir::{BinOpKind, Expr, ExprKind, Lit};
-use rustc_lint::{LateContext, LateLintPass};
+use rustc_lint::{LateContext, LateLintPass, LintContext};
+use rustc_middle::lint::in_external_macro;
 use rustc_session::{declare_lint_pass, declare_tool_lint};
 
 declare_clippy_lint! {
@@ -28,6 +29,7 @@ declare_lint_pass!(ConfusingXorAndPow => [SUSPICIOUS_XOR]);
 impl LateLintPass<'_> for ConfusingXorAndPow {
     fn check_expr(&mut self, cx: &LateContext<'_>, expr: &Expr<'_>) {
         if_chain! {
+            if !in_external_macro(cx.sess(), expr.span);
             if let ExprKind::Binary(op, left, right) = &expr.kind;
             if op.node == BinOpKind::BitXor;
             if let ExprKind::Lit(litr) = &right.kind;
