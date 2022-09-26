@@ -1,5 +1,4 @@
 use clippy_utils::{numeric_literal::NumericLiteral, source::snippet};
-use rustc_ast::LitKind;
 use rustc_errors::Applicability;
 use rustc_hir::{BinOpKind, Expr, ExprKind, Lit};
 use rustc_lint::{LateContext, LateLintPass, LintContext};
@@ -28,20 +27,17 @@ declare_lint_pass!(ConfusingXorAndPow => [SUSPICIOUS_XOR]);
 
 impl LateLintPass<'_> for ConfusingXorAndPow {
     fn check_expr(&mut self, cx: &LateContext<'_>, expr: &Expr<'_>) {
-        if_chain! {
-            if !in_external_macro(cx.sess(), expr.span);
-            if let ExprKind::Binary(op, left, right) = &expr.kind;
-            if op.node == BinOpKind::BitXor;
-            if let ExprKind::Lit(lit_left) = &left.kind;
-            if let ExprKind::Lit(lit_right) = &right.kind;
-            if let snip_left = snippet(cx, lit_left.span, "..");
-            if let snip_right = snippet(cx, lit_right.span, "..");
-            if let Some(left_val) = get_numlit(lit_left, &snip_left);
-            if let Some(right_val) = get_numlit(lit_right, &snip_right);
-            if left_val.is_decimal() && right_val.is_decimal();
-                then {
-                    // Even then, warn always.
-                    clippy_utils::diagnostics::span_lint_and_sugg(
+        if !in_external_macro(cx.sess(), expr.span) &&
+            let ExprKind::Binary(op, left, right) = &expr.kind &&
+            op.node == BinOpKind::BitXor &&
+            let ExprKind::Lit(lit_left) = &left.kind &&
+            let ExprKind::Lit(lit_right) = &right.kind &&
+            let snip_left = snippet(cx, lit_left.span, "..") &&
+            let snip_right = snippet(cx, lit_right.span, "..") &&
+            let Some(left_val) = get_numlit(lit_left, &snip_left) &&
+            let Some(right_val) = get_numlit(lit_right, &snip_right) &&
+            left_val.is_decimal() && right_val.is_decimal() {
+                clippy_utils::diagnostics::span_lint_and_sugg(
                         cx,
                         SUSPICIOUS_XOR,
                         expr.span,
@@ -50,8 +46,7 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
                         format!("{}.pow({})", left_val.format(), right_val.format()),
                         Applicability::MaybeIncorrect,
                     );
-                }
-        }
+            }
     }
 }
 
