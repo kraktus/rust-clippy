@@ -10,6 +10,7 @@ macro_rules! macro_test {
 
 fn main() {
     // Should warn:
+    let _ = 2 ^ 5;
     let _ = 2i32 ^ 9i32;
     let _ = 2i32 ^ 2i32;
     let _ = 50i32 ^ 3i32;
