@@ -6,7 +6,6 @@ pub static RENAMED_LINTS: &[(&str, &str)] = &[
     ("clippy::block_in_if_condition_expr", "clippy::blocks_in_if_conditions"),
     ("clippy::block_in_if_condition_stmt", "clippy::blocks_in_if_conditions"),
     ("clippy::box_vec", "clippy::box_collection"),
-    ("clippy::confusing_xor_and_pow", "clippy::suspicious_xor"),
     ("clippy::const_static_lifetime", "clippy::redundant_static_lifetimes"),
     ("clippy::cyclomatic_complexity", "clippy::cognitive_complexity"),
     ("clippy::disallowed_method", "clippy::disallowed_methods"),
