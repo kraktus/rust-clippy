@@ -1,6 +1,6 @@
 use clippy_utils::{numeric_literal::NumericLiteral, source::snippet};
 use rustc_errors::Applicability;
-use rustc_hir::{BinOpKind, Expr, ExprKind, Lit};
+use rustc_hir::{BinOpKind, Expr, ExprKind};
 use rustc_lint::{LateContext, LateLintPass, LintContext};
 use rustc_middle::lint::in_external_macro;
 use rustc_session::{declare_lint_pass, declare_tool_lint};
@@ -34,8 +34,8 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             let ExprKind::Lit(lit_right) = &right.kind &&
             let snip_left = snippet(cx, lit_left.span, "..") &&
             let snip_right = snippet(cx, lit_right.span, "..") &&
-            let Some(left_val) = NumericLiteral::from_lit_kind(lit_left, &snip_left) &&
-            let Some(right_val) = NumericLiteral::from_lit_kind(lit_right, &snip_right) &&
+            let Some(left_val) = NumericLiteral::from_lit_kind(&snip_left, &lit_left.node) &&
+            let Some(right_val) = NumericLiteral::from_lit_kind(&snip_right, &lit_right.node) &&
             left_val.is_decimal() && right_val.is_decimal() {
                 clippy_utils::diagnostics::span_lint_and_sugg(
                         cx,
