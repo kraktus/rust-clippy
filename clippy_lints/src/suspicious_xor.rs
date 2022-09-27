@@ -49,7 +49,3 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             }
     }
 }
-
-fn get_numlit<'a>(lit: &Lit, snip: &'a str) -> Option<NumericLiteral<'a>> {
-    NumericLiteral::from_lit_kind(snip, &lit.node)
-}
