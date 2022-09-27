@@ -8,7 +8,7 @@ use clippy_utils::visitors::find_all_ret_expressions;
 use clippy_utils::{fn_def_id, get_parent_expr, is_diag_item_method, is_diag_trait_item, return_ty};
 use clippy_utils::{meets_msrv, msrvs};
 use rustc_errors::Applicability;
-use rustc_hir::{def_id::DefId, BorrowKind, Expr, ExprKind, ItemKind, Node};
+use rustc_hir::{def_id::DefId, BorrowKind, Expr, ExprKind, ItemKind, LangItem, Node};
 use rustc_infer::infer::TyCtxtInferExt;
 use rustc_lint::LateContext;
 use rustc_middle::mir::Mutability;
@@ -133,12 +133,11 @@ fn check_addr_of_expr(
                     cx,
                     UNNECESSARY_TO_OWNED,
                     parent.span,
-                    &format!("unnecessary use of `{}`", method_name),
+                    &format!("unnecessary use of `{method_name}`"),
                     "use",
                     format!(
-                        "{:&>width$}{}",
+                        "{:&>width$}{receiver_snippet}",
                         "",
-                        receiver_snippet,
                         width = n_target_refs - n_receiver_refs
                     ),
                     Applicability::MachineApplicable,
@@ -155,7 +154,7 @@ fn check_addr_of_expr(
                             cx,
                             UNNECESSARY_TO_OWNED,
                             parent.span,
-                            &format!("unnecessary use of `{}`", method_name),
+                            &format!("unnecessary use of `{method_name}`"),
                             "use",
                             receiver_snippet,
                             Applicability::MachineApplicable,
@@ -165,7 +164,7 @@ fn check_addr_of_expr(
                             cx,
                             UNNECESSARY_TO_OWNED,
                             expr.span.with_lo(receiver.span.hi()),
-                            &format!("unnecessary use of `{}`", method_name),
+                            &format!("unnecessary use of `{method_name}`"),
                             "remove this",
                             String::new(),
                             Applicability::MachineApplicable,
@@ -182,9 +181,9 @@ fn check_addr_of_expr(
                         cx,
                         UNNECESSARY_TO_OWNED,
                         parent.span,
-                        &format!("unnecessary use of `{}`", method_name),
+                        &format!("unnecessary use of `{method_name}`"),
                         "use",
-                        format!("{}.as_ref()", receiver_snippet),
+                        format!("{receiver_snippet}.as_ref()"),
                         Applicability::MachineApplicable,
                     );
                     return true;
@@ -229,9 +228,9 @@ fn check_into_iter_call_arg(
                 cx,
                 UNNECESSARY_TO_OWNED,
                 parent.span,
-                &format!("unnecessary use of `{}`", method_name),
+                &format!("unnecessary use of `{method_name}`"),
                 "use",
-                format!("{}.iter().{}()", receiver_snippet, cloned_or_copied),
+                format!("{receiver_snippet}.iter().{cloned_or_copied}()"),
                 Applicability::MaybeIncorrect,
             );
             return true;
@@ -276,9 +275,9 @@ fn check_other_call_arg<'tcx>(
                 cx,
                 UNNECESSARY_TO_OWNED,
                 maybe_arg.span,
-                &format!("unnecessary use of `{}`", method_name),
+                &format!("unnecessary use of `{method_name}`"),
                 "use",
-                format!("{:&>width$}{}", "", receiver_snippet, width = n_refs),
+                format!("{:&>n_refs$}{receiver_snippet}", ""),
                 Applicability::MachineApplicable,
             );
             return true;
@@ -380,6 +379,10 @@ fn can_change_type<'a>(cx: &LateContext<'a>, mut expr: &'a Expr<'a>, mut ty: Ty<
             Node::Expr(parent_expr) => {
                 if let Some((callee_def_id, call_substs, recv, call_args)) = get_callee_substs_and_args(cx, parent_expr)
                 {
+                    if cx.tcx.lang_items().require(LangItem::IntoFutureIntoFuture) == Ok(callee_def_id) {
+                        return false;
+                    }
+
                     let fn_sig = cx.tcx.fn_sig(callee_def_id).skip_binder();
                     if let Some(arg_index) = recv.into_iter().chain(call_args).position(|arg| arg.hir_id == expr.hir_id)
                         && let Some(param_ty) = fn_sig.inputs().get(arg_index)

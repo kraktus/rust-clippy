@@ -18,7 +18,7 @@ use rustc_middle::mir::FakeReadCause;
 use rustc_middle::ty::{self, TypeVisitable};
 use rustc_session::{declare_lint_pass, declare_tool_lint};
 use rustc_span::symbol::kw;
-use rustc_span::{sym, Span};
+use rustc_span::{sym, Span, DUMMY_SP};
 use rustc_target::spec::abi::Abi;
 use rustc_trait_selection::traits;
 use rustc_trait_selection::traits::misc::can_type_implement_copy;
@@ -186,6 +186,7 @@ impl<'tcx> LateLintPass<'tcx> for NeedlessPassByValue {
                 if !is_self(arg);
                 if !ty.is_mutable_ptr();
                 if !is_copy(cx, ty);
+                if ty.is_sized(cx.tcx.at(DUMMY_SP), cx.param_env);
                 if !allowed_traits.iter().any(|&t| implements_trait(cx, ty, t, &[]));
                 if !implements_borrow_trait;
                 if !all_borrowable_trait;
@@ -236,7 +237,7 @@ impl<'tcx> LateLintPass<'tcx> for NeedlessPassByValue {
                                         snippet_opt(cx, span)
                                             .map_or(
                                                 "change the call to".into(),
-                                                |x| Cow::from(format!("change `{}` to", x)),
+                                                |x| Cow::from(format!("change `{x}` to")),
                                             )
                                             .as_ref(),
                                         suggestion,
@@ -266,7 +267,7 @@ impl<'tcx> LateLintPass<'tcx> for NeedlessPassByValue {
                                         snippet_opt(cx, span)
                                             .map_or(
                                                 "change the call to".into(),
-                                                |x| Cow::from(format!("change `{}` to", x))
+                                                |x| Cow::from(format!("change `{x}` to"))
                                             )
                                             .as_ref(),
                                         suggestion,
