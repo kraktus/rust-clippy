@@ -34,8 +34,8 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             let ExprKind::Lit(lit_right) = &right.kind &&
             let snip_left = snippet(cx, lit_left.span, "..") &&
             let snip_right = snippet(cx, lit_right.span, "..") &&
-            let Some(left_val) = get_numlit(lit_left, &snip_left) &&
-            let Some(right_val) = get_numlit(lit_right, &snip_right) &&
+            let Some(left_val) = NumericLiteral::from_lit_kind(lit_left, &snip_left) &&
+            let Some(right_val) = NumericLiteral::from_lit_kind(lit_right, &snip_right) &&
             left_val.is_decimal() && right_val.is_decimal() {
                 clippy_utils::diagnostics::span_lint_and_sugg(
                         cx,
