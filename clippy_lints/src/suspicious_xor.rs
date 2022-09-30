@@ -1,4 +1,4 @@
-use clippy_utils::{numeric_literal::NumericLiteral, source::snippet};
+use clippy_utils::{numeric_literal::NumericLiteral, source::snippet_with_context};
 use rustc_errors::Applicability;
 use rustc_hir::{BinOpKind, Expr, ExprKind};
 use rustc_lint::{LateContext, LateLintPass, LintContext};
@@ -32,20 +32,38 @@ impl LateLintPass<'_> for ConfusingXorAndPow {
             op.node == BinOpKind::BitXor &&
             let ExprKind::Lit(lit_left) = &left.kind &&
             let ExprKind::Lit(lit_right) = &right.kind &&
-            let snip_left = snippet(cx, lit_left.span, "..") &&
-            let snip_right = snippet(cx, lit_right.span, "..") &&
-            let Some(left_val) = NumericLiteral::from_lit_kind(&snip_left, &lit_left.node) &&
-            let Some(right_val) = NumericLiteral::from_lit_kind(&snip_right, &lit_right.node) &&
-            left_val.is_decimal() && right_val.is_decimal() {
-                clippy_utils::diagnostics::span_lint_and_sugg(
-                        cx,
-                        SUSPICIOUS_XOR,
-                        expr.span,
-                        "'^' is not the exponentiation operator",
-                        "did you mean to write",
-                        format!("{}.pow({})", left_val.format(), right_val.format()),
-                        Applicability::MaybeIncorrect,
-                    );
-            }
+            let snip_left = snippet_with_context(cx, lit_left.span, lit_left.span.ctxt(), "..", &mut Applicability::MaybeIncorrect) &&
+            let snip_right = snippet_with_context(cx, lit_right.span, lit_right.span.ctxt(), "..", &mut Applicability::MaybeIncorrect) &&
+            let Some(left_val) = NumericLiteral::from_lit_kind(&snip_left.0, &lit_left.node) &&
+            let Some(right_val) = NumericLiteral::from_lit_kind(&snip_right.0, &lit_right.node)
+{
+				dbg!("{:#?} {:#?}", lit_left.span.ctxt().outer_expn_data(), lit_right.span.ctxt().outer_expn_data());
+				if !snip_left.1 && !snip_right.1 {
+					if left_val.is_decimal() && right_val.is_decimal() {
+					dbg!("{:#?} {:#?}", &lit_left.span.ctxt(), &lit_right.span.ctxt());
+					// clippy_utils::diagnostics::span_lint_and_sugg(
+					//         cx,
+					//         SUSPICIOUS_XOR,
+					//         expr.span,
+					//         "'^' is not the exponentiation operator",
+					//         "did you mean to write",
+					//         format!("{}.pow({})", left_val.format(), right_val.format()),
+					//         Applicability::MaybeIncorrect,
+					//     );
+					}
+				} else {
+					// if snip_left.1 {
+					// 	if snip_right.1 {
+					// 		dbg!("{:#?} {:#?}", lit_left.span.ctxt().outer_expn_data(), lit_right.span.ctxt().outer_expn_data());
+					// 	} else {
+					// 		dbg!("{:#?} {:#?}", lit_left.span.ctxt().outer_expn_data(), lit_right.span.ctxt().outer_expn_data());
+					// 	}
+					// } else {
+					// 	if snip_right.1 {
+					// 		dbg!("{:#?} {:#?}", lit_left.span.ctxt().outer_expn_data(), lit_right.span.ctxt().outer_expn_data());
+					// 	}
+					// }
+				}
+			}
     }
 }
