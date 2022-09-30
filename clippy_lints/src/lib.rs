@@ -905,7 +905,7 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
     store.register_early_pass(|| Box::new(multi_assignments::MultiAssignments));
     store.register_late_pass(|_| Box::new(bool_to_int_with_if::BoolToIntWithIf));
     store.register_late_pass(|_| Box::new(box_default::BoxDefault));
-    store.register_late_pass(|| Box::new(suspicious_xor::ConfusingXorAndPow));
+    store.register_late_pass(|_| Box::new(suspicious_xor::ConfusingXorAndPow));
     // add lints here, do not remove this comment, it's used in `new_lint`
 }
 
