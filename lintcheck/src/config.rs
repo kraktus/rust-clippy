@@ -43,8 +43,9 @@ fn get_clap_config() -> ArgMatches {
                 .conflicts_with("fix"),
             Arg::new("verbose")
                 .short('v')
+                .long("--verbose")
                 .action(ArgAction::Count)
-                .help("Verbosity to use, default to WARN")
+                .help("Verbosity to use, default to WARN"),
         ])
         .get_matches()
 }
@@ -74,17 +75,20 @@ impl LintcheckConfig {
         let clap_config = get_clap_config();
         let mut builder = Builder::new();
         builder
-        .filter(
-            None,
-            match clap_config.get_count("verbose") {
-                0 => LevelFilter::Warn,
-                1 => LevelFilter::Info,
-                2 => LevelFilter::Debug,
-                _ => LevelFilter::Trace,
-            },
-        )
-        .default_format()
-        .init();
+            .filter(
+                None,
+                match clap_config.get_count("verbose") {
+                    0 => LevelFilter::Warn,
+                    1 => LevelFilter::Info,
+                    2 => dbg!(LevelFilter::Debug),
+                    _ => LevelFilter::Trace,
+                },
+            )
+            .default_format()
+            .init();
+        assert_eq!(clap_config.get_count("verbose"), 2);
+        log::debug!("Test");
+        println!("{:?}", builder);
 
         // first, check if we got anything passed via the LINTCHECK_TOML env var,
         // if not, ask clap if we got any value for --crates-toml  <foo>

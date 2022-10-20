@@ -410,9 +410,7 @@ impl Crate {
         let status = &all_output.status;
 
         if !status.success() {
-            warn!("bad exit status after checking {} {} \n",
-                self.name, self.version
-            );
+            warn!("bad exit status after checking {} {} \n", self.name, self.version);
         }
 
         if config.fix {
