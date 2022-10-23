@@ -692,7 +692,7 @@ fn main() {
         let _ = write!(text, "{cratename}: '{msg}'");
     }
 
-    println!("Writing logs to {}", config.lintcheck_results_path.display());
+    println!("Writing results to {}", config.lintcheck_results_path.display());
     fs::write(&config.lintcheck_results_path, text).unwrap();
 
     print_stats(old_stats, new_stats, &config.lint_filter);

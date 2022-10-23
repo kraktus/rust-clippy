@@ -82,8 +82,8 @@ impl LintcheckConfig {
             2 => dbg!(LevelFilter::Debug),
             _ => LevelFilter::Trace,
         };
-        // creating the dir that will contain the log and results
-        fs::create_dir("lintcheck-logs").expect("Creating the log dir failed");
+        // using `create_dir_all` as it does not error when the dir already exists
+        fs::create_dir_all("lintcheck-logs").expect("Creating the log dir failed");
         let _ = CombinedLogger::init(vec![
             TermLogger::new(level_filter, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
             WriteLogger::new(
@@ -112,7 +112,7 @@ impl LintcheckConfig {
         // wasd.toml, use "wasd"...)
         let filename: PathBuf = sources_toml_path.file_stem().unwrap().into();
         let lintcheck_results_path = PathBuf::from(format!(
-            "lintcheck-logs/{}_logs.{}",
+            "lintcheck-logs/{}_results.{}",
             filename.display(),
             if markdown { "md" } else { "txt" }
         ));
