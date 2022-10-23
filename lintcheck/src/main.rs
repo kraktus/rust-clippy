@@ -693,7 +693,6 @@ fn main() {
     }
 
     println!("Writing logs to {}", config.lintcheck_results_path.display());
-    fs::create_dir_all(config.lintcheck_results_path.parent().unwrap()).unwrap();
     fs::write(&config.lintcheck_results_path, text).unwrap();
 
     print_stats(old_stats, new_stats, &config.lint_filter);

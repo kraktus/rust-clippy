@@ -1,7 +1,8 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use env_logger::Builder;
 use log::LevelFilter;
+use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
 use std::env;
+use std::fs::{self, File};
 use std::path::PathBuf;
 
 fn get_clap_config() -> ArgMatches {
@@ -58,6 +59,8 @@ pub(crate) struct LintcheckConfig {
     pub sources_toml_path: PathBuf,
     /// we save the clippy lint results here
     pub lintcheck_results_path: PathBuf,
+    // /// we save the clippy logs here
+    // pub lintcheck_log_path: PathBuf,
     /// Check only a specified package
     pub only: Option<String>,
     /// whether to just run --fix and not collect all the warnings
@@ -73,22 +76,24 @@ pub(crate) struct LintcheckConfig {
 impl LintcheckConfig {
     pub fn new() -> Self {
         let clap_config = get_clap_config();
-        let mut builder = Builder::new();
-        builder
-            .filter(
-                None,
-                match clap_config.get_count("verbose") {
-                    0 => LevelFilter::Warn,
-                    1 => LevelFilter::Info,
-                    2 => dbg!(LevelFilter::Debug),
-                    _ => LevelFilter::Trace,
-                },
-            )
-            .default_format()
-            .init();
-        assert_eq!(clap_config.get_count("verbose"), 2);
+        let level_filter = match clap_config.get_count("verbose") {
+            0 => LevelFilter::Warn,
+            1 => LevelFilter::Info,
+            2 => dbg!(LevelFilter::Debug),
+            _ => LevelFilter::Trace,
+        };
+        // creating the dir that will contain the log and results
+        fs::create_dir("lintcheck-logs").expect("Creating the log dir failed");
+        let _ = CombinedLogger::init(vec![
+            TermLogger::new(level_filter, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            WriteLogger::new(
+                level_filter,
+                Config::default(),
+                File::create("lintcheck-logs/lintcheck.log").unwrap(),
+            ),
+        ]);
+        // assert_eq!(clap_config.get_count("verbose"), 2);
         log::debug!("Test");
-        println!("{:?}", builder);
 
         // first, check if we got anything passed via the LINTCHECK_TOML env var,
         // if not, ask clap if we got any value for --crates-toml  <foo>
