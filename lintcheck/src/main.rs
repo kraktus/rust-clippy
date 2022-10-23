@@ -656,11 +656,6 @@ fn main() {
         clippy_warnings.extend(server.warnings());
     }
 
-    // if we are in --fix mode, don't change the log files, terminate here
-    if config.fix {
-        return;
-    }
-
     // generate some stats
     let (stats_formatted, new_stats) = gather_stats(&clippy_warnings);
 
