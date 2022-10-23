@@ -92,8 +92,6 @@ impl LintcheckConfig {
                 File::create("lintcheck-logs/lintcheck.log").unwrap(),
             ),
         ]);
-        // assert_eq!(clap_config.get_count("verbose"), 2);
-        log::debug!("Test");
 
         // first, check if we got anything passed via the LINTCHECK_TOML env var,
         // if not, ask clap if we got any value for --crates-toml  <foo>
