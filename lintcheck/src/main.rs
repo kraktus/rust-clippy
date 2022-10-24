@@ -338,7 +338,9 @@ impl Crate {
         let shared_target_dir = clippy_project_root().join("target/lintcheck/shared_target_dir");
 
         let mut cargo_clippy_args = if config.fix {
-            vec!["--fix", "--"]
+            // need to pass `clippy` arg even if already feeding `cargo-clippy`
+            // see https://github.com/rust-lang/rust-clippy/pull/9461
+            vec!["clippy", "--fix", "--allow-no-vcs", "--"]
         } else {
             vec!["--", "--message-format=json", "--"]
         };
@@ -348,16 +350,18 @@ impl Crate {
             for opt in options {
                 clippy_args.push(opt);
             }
-        } else {
-            clippy_args.extend(["-Wclippy::pedantic", "-Wclippy::cargo"]);
         }
 
-        if lint_filter.is_empty() {
-            clippy_args.push("--cap-lints=warn");
+        // cap-lints flag is ignored when using `clippy --fix` for now
+        // So it needs to be passed directly to rustc
+        // see https://github.com/rust-lang/rust-clippy/issues/9703
+        let rustc_flags = if lint_filter.is_empty() {
+            clippy_args.extend(["-Wclippy::pedantic", "-Wclippy::cargo"]);
+            "--cap-lints=warn"
         } else {
-            clippy_args.push("--cap-lints=allow");
             clippy_args.extend(lint_filter.iter().map(std::string::String::as_str));
-        }
+            "--cap-lints=allow"
+        };
 
         if let Some(server) = server {
             let target = shared_target_dir.join("recursive");
@@ -391,9 +395,12 @@ impl Crate {
 
         cargo_clippy_args.extend(clippy_args);
 
+        debug!("Arguments passed to cargo clippy driver: {:?}", cargo_clippy_args);
+
         let all_output = Command::new(&cargo_clippy_path)
             // use the looping index to create individual target dirs
             .env("CARGO_TARGET_DIR", shared_target_dir.join(format!("_{thread_index:?}")))
+            .env("RUSTFLAGS", rustc_flags)
             .args(&cargo_clippy_args)
             .current_dir(&self.path)
             .output()
