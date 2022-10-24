@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use cargo_metadata::diagnostic::{Diagnostic, DiagnosticLevel};
 use cargo_metadata::Message;
-use log::{debug, error, warn};
+use log::{trace, debug, error, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::{DirEntry, WalkDir};
@@ -357,10 +357,11 @@ impl Crate {
         // see https://github.com/rust-lang/rust-clippy/issues/9703
         let rustc_flags = if lint_filter.is_empty() {
             clippy_args.extend(["-Wclippy::pedantic", "-Wclippy::cargo"]);
-            "--cap-lints=warn"
+            "--cap-lints=warn".to_string()
         } else {
-            clippy_args.extend(lint_filter.iter().map(std::string::String::as_str));
-            "--cap-lints=allow"
+            let mut lint_filter_buf = lint_filter.clone();
+            lint_filter_buf.push("--cap-lints=allow".to_string());
+            lint_filter_buf.join(" ")
         };
 
         if let Some(server) = server {
@@ -421,7 +422,7 @@ impl Crate {
         }
 
         if config.fix {
-            debug!("{}", stderr);
+            trace!("{}", stderr);
             if let Some(stderr) = stderr
                 .lines()
                 .find(|line| line.contains("failed to automatically apply fixes suggested by rustc to crate"))
