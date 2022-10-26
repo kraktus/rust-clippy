@@ -79,7 +79,7 @@ impl LintcheckConfig {
         let level_filter = match clap_config.get_count("verbose") {
             0 => LevelFilter::Warn,
             1 => LevelFilter::Info,
-            2 => dbg!(LevelFilter::Debug),
+            2 => LevelFilter::Debug,
             _ => LevelFilter::Trace,
         };
         // using `create_dir_all` as it does not error when the dir already exists
