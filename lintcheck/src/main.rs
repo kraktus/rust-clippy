@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use cargo_metadata::diagnostic::{Diagnostic, DiagnosticLevel};
 use cargo_metadata::Message;
-use log::{trace, debug, error, warn};
+use log::{debug, error, trace, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::{DirEntry, WalkDir};
