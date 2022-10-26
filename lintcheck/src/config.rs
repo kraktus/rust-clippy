@@ -85,7 +85,12 @@ impl LintcheckConfig {
         // using `create_dir_all` as it does not error when the dir already exists
         fs::create_dir_all("lintcheck-logs").expect("Creating the log dir failed");
         let _ = CombinedLogger::init(vec![
-            TermLogger::new(level_filter, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            TermLogger::new(
+                std::cmp::min(level_filter, LevelFilter::Info),
+                Config::default(),
+                TerminalMode::Mixed,
+                ColorChoice::Auto,
+            ),
             WriteLogger::new(
                 level_filter,
                 Config::default(),
