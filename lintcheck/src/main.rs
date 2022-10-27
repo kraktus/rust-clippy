@@ -167,7 +167,7 @@ fn get(path: &str) -> Result<ureq::Response, ureq::Error> {
             Err(ureq::Error::Transport(e)) => error!("{}", e),
             Err(e) => return Err(e),
         }
-        eprintln!("retrying in {retries} seconds...");
+        warn!("retrying in {retries} seconds...");
         thread::sleep(Duration::from_secs(u64::from(retries)));
         retries += 1;
     }
@@ -237,7 +237,7 @@ impl CrateSource {
                         .expect("Failed to clone git repo!")
                         .success()
                     {
-                        eprintln!("Failed to clone {url} into {}", repo_path.display());
+                        warn!("Failed to clone {url} into {}", repo_path.display());
                     }
                 }
                 // check out the commit/branch/whatever
@@ -250,7 +250,7 @@ impl CrateSource {
                     .expect("Failed to check out commit")
                     .success()
                 {
-                    eprintln!("Failed to checkout {commit} of repo at {}", repo_path.display());
+                    warn!("Failed to checkout {commit} of repo at {}", repo_path.display());
                 }
 
                 Crate {
@@ -582,7 +582,7 @@ fn main() {
 
     // assert that we launch lintcheck from the repo root (via cargo lintcheck)
     if std::fs::metadata("lintcheck/Cargo.toml").is_err() {
-        eprintln!("lintcheck needs to be run from clippy's repo root!\nUse `cargo lintcheck` alternatively.");
+        error!("lintcheck needs to be run from clippy's repo root!\nUse `cargo lintcheck` alternatively.");
         std::process::exit(3);
     }
 
