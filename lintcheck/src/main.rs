@@ -189,14 +189,25 @@ impl CrateSource {
                 create_dirs(&krate_download_dir, &extract_dir);
 
                 let krate_file_path = krate_download_dir.join(format!("{name}-{version}.crate.tar.gz"));
-                // don't download/extract if we already have done so
+                // don't download if we already have done so
                 if !krate_file_path.is_file() {
                     // create a file path to download and write the crate data into
                     let mut krate_dest = std::fs::File::create(&krate_file_path).unwrap();
                     let mut krate_req = get(&url).unwrap().into_reader();
                     // copy the crate into the file
                     std::io::copy(&mut krate_req, &mut krate_dest).unwrap();
+                }
 
+                // if the source code was altered (previous use of `--fix`), we need to restore the crate
+                // to its original state by re-extracting it
+                if !extracted_krate_dir.exists()
+                    || extracted_krate_dir.metadata().map_or(false, |metadata| {
+                        metadata.created().map_or(false, |created| {
+                            metadata.modified().map_or(false, |modified| created != modified)
+                        })
+                    })
+                {
+                    debug!("extracting {} {}", name, version);
                     // unzip the tarball
                     let ungz_tar = flate2::read::GzDecoder::new(std::fs::File::open(&krate_file_path).unwrap());
                     // extract the tar archive
@@ -338,7 +349,9 @@ impl Crate {
         let shared_target_dir = clippy_project_root().join("target/lintcheck/shared_target_dir");
 
         let mut cargo_clippy_args = if config.fix {
-            vec!["--fix", "--"]
+            // need to pass `clippy` arg even if already feeding `cargo-clippy`
+            // see https://github.com/rust-lang/rust-clippy/pull/9461
+            vec!["clippy", "--fix", "--allow-no-vcs", "--"]
         } else {
             vec!["--", "--message-format=json", "--"]
         };
@@ -348,16 +361,19 @@ impl Crate {
             for opt in options {
                 clippy_args.push(opt);
             }
-        } else {
-            clippy_args.extend(["-Wclippy::pedantic", "-Wclippy::cargo"]);
         }
 
-        if lint_filter.is_empty() {
-            clippy_args.push("--cap-lints=warn");
+        // cap-lints flag is ignored when using `clippy --fix` for now
+        // So it needs to be passed directly to rustc
+        // see https://github.com/rust-lang/rust-clippy/issues/9703
+        let rustc_flags = if lint_filter.is_empty() {
+            clippy_args.extend(["-Wclippy::pedantic", "-Wclippy::cargo"]);
+            "--cap-lints=warn".to_string()
         } else {
-            clippy_args.push("--cap-lints=allow");
-            clippy_args.extend(lint_filter.iter().map(std::string::String::as_str));
-        }
+            let mut lint_filter_buf = lint_filter.clone();
+            lint_filter_buf.push("--cap-lints=allow".to_string());
+            lint_filter_buf.join(" ")
+        };
 
         if let Some(server) = server {
             let target = shared_target_dir.join("recursive");
@@ -396,6 +412,7 @@ impl Crate {
         let all_output = Command::new(&cargo_clippy_path)
             // use the looping index to create individual target dirs
             .env("CARGO_TARGET_DIR", shared_target_dir.join(format!("_{thread_index:?}")))
+            .env("RUSTFLAGS", rustc_flags)
             .args(&cargo_clippy_args)
             .current_dir(&self.path)
             .output()
