@@ -181,6 +181,7 @@ impl CrateSource {
         match self {
             CrateSource::CratesIo { name, version, options } => {
                 let extract_dir = PathBuf::from(LINTCHECK_SOURCES);
+                let extracted_krate_dir = extract_dir.join(format!("{name}-{version}/"));
                 let krate_download_dir = PathBuf::from(LINTCHECK_DOWNLOADS);
 
                 // url to download the crate from crates.io
@@ -202,13 +203,14 @@ impl CrateSource {
                     // extract the tar archive
                     let mut archive = tar::Archive::new(ungz_tar);
                     archive.unpack(&extract_dir).expect("Failed to extract!");
+                    Self::set_git_repo(&extracted_krate_dir)
                 }
                 // crate is extracted, return a new Krate object which contains the path to the extracted
                 // sources that clippy can check
                 Crate {
                     version: version.clone(),
                     name: name.clone(),
-                    path: extract_dir.join(format!("{name}-{version}/")),
+                    path: extracted_krate_dir,
                     options: options.clone(),
                 }
             },
@@ -299,6 +301,26 @@ impl CrateSource {
             },
         }
     }
+
+    // hugly hack FIXME
+    fn set_git_repo(crate_path: &PathBuf) {
+        assert!(
+            Command::new("git")
+                .args(["init"])
+                .current_dir(crate_path)
+                .status()
+                .unwrap_or_else(|_| panic!("Failed to add all files repository for {:?}", &crate_path))
+                .success()
+        );
+        assert!(
+            Command::new("git")
+                .args(["add", "-A"])
+                .current_dir(crate_path)
+                .status()
+                .unwrap_or_else(|_| panic!("Failed to add all files repository for {:?}", &crate_path))
+                .success()
+        );
+    }
 }
 
 impl Crate {
@@ -340,7 +362,7 @@ impl Crate {
         let mut cargo_clippy_args = if config.fix {
             // need to pass `clippy` arg even if already feeding `cargo-clippy`
             // see https://github.com/rust-lang/rust-clippy/pull/9461
-            vec!["clippy", "--fix", "--allow-no-vcs", "--"]
+            vec!["clippy", "--fix", "--broken-code", "--"]
         } else {
             vec!["--", "--message-format=json", "--"]
         };
