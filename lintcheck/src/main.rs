@@ -320,6 +320,14 @@ impl CrateSource {
                 .unwrap_or_else(|_| panic!("Failed to add all files repository for {:?}", &crate_path))
                 .success()
         );
+        assert!(
+            Command::new("git")
+                .args(["commit", "-m", "baseline commit"])
+                .current_dir(crate_path)
+                .status()
+                .unwrap_or_else(|_| panic!("Failed to commit all files repository for {:?}", &crate_path))
+                .success()
+        );
     }
 }
 
